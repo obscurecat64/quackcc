@@ -7,10 +7,25 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  printf(".global _main\n");
-  printf("\n");
+  char *p = argv[1];
+
+  printf(".global _main\n\n");
   printf("_main:\n");
-  printf("    mov x0, #%d\n", atoi(argv[1]));
+  printf("    mov x0, #%d\n", strtol(p, &p, 10));
+
+  while (*p) {
+    if (*p == '+') {
+      p++;
+      printf("    add x0, x0, #%d\n", strtol(p, &p, 10));
+    } else if (*p == '-') {
+      p++;
+      printf("    sub x0, x0, #%d\n", strtol(p, &p, 10));
+    } else {
+      fprintf(stderr, "unexpected character: '%c'\n", *p);
+      return 1;
+    }
+  }
+
   printf("    ret\n");
   return 0;
 }
