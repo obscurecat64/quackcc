@@ -20,6 +20,8 @@ typedef struct Token {
   int len;
 } Token;
 
+static char *current_input;
+
 // Reports an error and exit.
 static void error(char *fmt, ...) {
   va_list ap;
@@ -27,6 +29,23 @@ static void error(char *fmt, ...) {
   vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
   exit(1);
+}
+
+static void verror_at(char *loc, char *fmt, va_list ap) {
+  int pos = loc - current_input;
+  fprintf(stderr, "POS: %d\n", pos);
+  fprintf(stderr, "%s\n", current_input);
+  fprintf(stderr, "%*s", pos, ""); // print pos spaces.
+  fprintf(stderr, "^ ");
+  vfprintf(stderr, fmt, ap);
+  fprintf(stderr, "\n");
+  exit(1);
+}
+
+static void error_at(char *loc, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(loc, fmt, ap);
 }
 
 static Token *create_token(TokenKind kind, char *start, char *end) {
@@ -55,7 +74,7 @@ static Token *get_next_token(char **pp) {
     return create_token(TK_PUNC, start, ++(*pp));
   }
 
-  error("invalid token");
+  error_at(*pp, "invalid token!");
   return NULL;
 }
 
@@ -71,7 +90,7 @@ static Token *tokenise(char *p) {
 }
 
 static int get_number(Token *token) {
-  if (token->kind != TK_NUM) error("expected a number");
+  if (token->kind != TK_NUM) error_at(token->loc, "expected a number");
   return token->val;
 }
 
@@ -82,10 +101,10 @@ static bool equal(Token *token, char *val) {
 int main(int argc, char **argv) {
   if (argc != 2) error("%s: invalid number of arguments\n", argv[0]);
   
-  char *p = argv[1];
+  current_input = argv[1];
 
   // tokenise
-  Token *token = tokenise(p);
+  Token *token = tokenise(current_input);
 
   printf(".global _main\n\n");
   printf("_main:\n");
@@ -110,7 +129,7 @@ int main(int argc, char **argv) {
       continue;
     }
 
-    error("expected '+' or '-'");
+    error_at(token->loc, "invalid token!");
   }
 
   printf("    ret\n");
