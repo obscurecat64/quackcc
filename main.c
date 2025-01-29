@@ -110,7 +110,8 @@ typedef enum {
   NK_ADD,
   NK_SUB,
   NK_MUL,
-  NK_DIV
+  NK_DIV,
+  NK_NEG,
 } NodeKind;
 
 typedef struct Node Node;
@@ -129,26 +130,34 @@ static Node* create_binary(NodeKind kind, Node *lhs, Node *rhs) {
   return node;
 }
 
+static Node* create_unary(NodeKind kind, Node *expr) {
+  Node *node = calloc(1, sizeof(Token));
+  node->kind = kind;
+  node->lhs = expr;
+  return node;
+}
+
 static Node* create_num(int val) {
   Node *node = calloc(1, sizeof(Token));
   node->val = val;
   return node;
 }
 
-static void consume(Token **chain) {
+static void skip(Token **chain) {
   *chain = (*chain)->next;
 }
 
-static void consume_if_equal(Token **chain, char *s) {
+static void consume(Token **chain, char *s) {
   Token *head = *chain;
   if (!equal(head, s)) error_at(head->loc, "expected '%s'", s);
-  consume(chain);
+  skip(chain);
 }
 
 static Node *expr(Token **chain);
 static Node *expr_prime(Token **chain, Node *lhs);
 static Node *term(Token **chain);
 static Node *term_prime(Token **chain, Node *lhs);
+static Node *unary(Token **chain);
 static Node *factor(Token **chain);
 
 // Expr -> Term Expr'
@@ -160,14 +169,14 @@ static Node *expr(Token **chain) {
   return node_b;
 }
 
-// Expr' -> + Term Expr' | - Term Expr' | ε
+// Expr' -> '+' Term Expr' | '-' Term Expr' | ε
 static Node *expr_prime(Token **chain, Node* lhs) {
   Token *head = *chain;
 
   if (!equal(head, "+") && !equal(head, "-")) return NULL;
 
   NodeKind kind = equal(head, "+") ? NK_ADD : NK_SUB;
-  consume(chain);
+  skip(chain);
 
   Node *node_a = create_binary(kind, lhs, term(chain));
   Node *node_b = expr_prime(chain, node_a);
@@ -176,29 +185,46 @@ static Node *expr_prime(Token **chain, Node* lhs) {
   return node_b;
 }
 
-// Term -> Factor Term'
+// Term -> Unary Term'
 static Node *term(Token **chain) {
-  Node *node_a = factor(chain);
+  Node *node_a = unary(chain);
   Node *node_b = term_prime(chain, node_a);
 
   if (node_b == NULL) return node_a;
   return node_b;
 }
 
-// Term' -> * Factor Term' | / Factor Term' | ε
+// Term' -> '*' Unary Term' | '/' Unary Term' | ε
 static Node *term_prime(Token **chain, Node *lhs) {
   Token *head = *chain;
 
   if (!equal(head, "*") && !equal(head, "/")) return NULL;
 
   NodeKind kind = equal(head, "*") ? NK_MUL : NK_DIV;
-  consume(chain);
+  skip(chain);
 
-  Node *node_a = create_binary(kind, lhs, factor(chain));
+  Node *node_a = create_binary(kind, lhs, unary(chain));
   Node *node_b = term_prime(chain, node_a);
 
   if (node_b == NULL) return node_a;
   return node_b;
+}
+
+// Unary -> '+' Unary | '-' Unary | Factor
+static Node *unary(Token **chain) {
+  Token *head = *chain;
+
+  if (equal(head, "+")) {
+    skip(chain);
+    return unary(chain);
+  }
+
+  if (equal(head, "-")) {
+    skip(chain);
+    return create_unary(NK_NEG, unary(chain));
+  }
+
+  return factor(chain);
 }
 
 // Factor -> Number | ( Expr )
@@ -207,13 +233,13 @@ static Node *factor(Token **chain) {
 
   if (head->kind == TK_NUM) {
     int val = head->val;
-    consume(chain);
+    skip(chain);
     return create_num(val);
   }
 
-  consume_if_equal(chain, "(");
+  consume(chain, "(");
   Node *node_a = expr(chain);
-  consume_if_equal(chain, ")");
+  consume(chain, ")");
 
   return node_a;
 }
@@ -235,6 +261,13 @@ static void gen_expr(Node *node) {
     return;
   }
 
+  if (node->kind == NK_NEG) {
+    gen_expr(node->lhs);
+    printf("    neg x0, x0\n");
+    return;
+  }
+
+  // binary
   // evaluate rhs, then push the value in x0 on stack
   // later on, we pop this value from the stack into x1 (since x0 is used by lhs)
   gen_expr(node->rhs);
