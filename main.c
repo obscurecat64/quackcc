@@ -12,13 +12,17 @@ typedef enum {
 } TokenKind;
 
 typedef struct Token Token;
-typedef struct Token {
+struct Token {
   TokenKind kind;
   Token *next;
   int val;
   char* loc;
   int len;
-} Token;
+};
+
+//
+// Tokeniser
+//
 
 static char *current_input;
 
@@ -33,7 +37,6 @@ static void error(char *fmt, ...) {
 
 static void verror_at(char *loc, char *fmt, va_list ap) {
   int pos = loc - current_input;
-  fprintf(stderr, "POS: %d\n", pos);
   fprintf(stderr, "%s\n", current_input);
   fprintf(stderr, "%*s", pos, ""); // print pos spaces.
   fprintf(stderr, "^ ");
@@ -70,7 +73,7 @@ static Token *get_next_token(char **pp) {
     return token;
   }
 
-  if (*start == '+' || *start == '-') {
+  if (ispunct(*start)) {
     return create_token(TK_PUNC, start, ++(*pp));
   }
 
@@ -94,9 +97,172 @@ static int get_number(Token *token) {
   return token->val;
 }
 
-static bool equal(Token *token, char *val) {
-  return memcmp(token->loc, val, token->len) == 0 && val[token->len] == '\0';
+static bool equal(Token *token, char *s) {
+  return memcmp(token->loc, s, token->len) == 0 && s[token->len] == '\0';
 }
+
+//
+// Parser
+//
+
+typedef enum {
+  NK_NUM,
+  NK_ADD,
+  NK_SUB,
+  NK_MUL,
+  NK_DIV
+} NodeKind;
+
+typedef struct Node Node;
+struct Node {
+  NodeKind kind;
+  Node *lhs;
+  Node *rhs;
+  int val;
+};
+
+static Node* create_binary(NodeKind kind, Node *lhs, Node *rhs) {
+  Node *node = calloc(1, sizeof(Token));
+  node->kind = kind;
+  node->lhs = lhs;
+  node->rhs = rhs;
+  return node;
+}
+
+static Node* create_num(int val) {
+  Node *node = calloc(1, sizeof(Token));
+  node->val = val;
+  return node;
+}
+
+static void consume(Token **chain) {
+  *chain = (*chain)->next;
+}
+
+static void consume_if_equal(Token **chain, char *s) {
+  Token *head = *chain;
+  if (!equal(head, s)) error_at(head->loc, "expected '%s'", s);
+  consume(chain);
+}
+
+static Node *expr(Token **chain);
+static Node *expr_prime(Token **chain, Node *lhs);
+static Node *term(Token **chain);
+static Node *term_prime(Token **chain, Node *lhs);
+static Node *factor(Token **chain);
+
+// Expr -> Term Expr'
+static Node *expr(Token **chain) {
+  Node *node_a = term(chain);
+  Node *node_b = expr_prime(chain, node_a);
+
+  if (node_b == NULL) return node_a;
+  return node_b;
+}
+
+// Expr' -> + Term Expr' | - Term Expr' | ε
+static Node *expr_prime(Token **chain, Node* lhs) {
+  Token *head = *chain;
+
+  if (!equal(head, "+") && !equal(head, "-")) return NULL;
+
+  NodeKind kind = equal(head, "+") ? NK_ADD : NK_SUB;
+  consume(chain);
+
+  Node *node_a = create_binary(kind, lhs, term(chain));
+  Node *node_b = expr_prime(chain, node_a);
+
+  if (node_b == NULL) return node_a;
+  return node_b;
+}
+
+// Term -> Factor Term'
+static Node *term(Token **chain) {
+  Node *node_a = factor(chain);
+  Node *node_b = term_prime(chain, node_a);
+
+  if (node_b == NULL) return node_a;
+  return node_b;
+}
+
+// Term' -> * Factor Term' | / Factor Term' | ε
+static Node *term_prime(Token **chain, Node *lhs) {
+  Token *head = *chain;
+
+  if (!equal(head, "*") && !equal(head, "/")) return NULL;
+
+  NodeKind kind = equal(head, "*") ? NK_MUL : NK_DIV;
+  consume(chain);
+
+  Node *node_a = create_binary(kind, lhs, factor(chain));
+  Node *node_b = term_prime(chain, node_a);
+
+  if (node_b == NULL) return node_a;
+  return node_b;
+}
+
+// Factor -> Number | ( Expr )
+static Node *factor(Token **chain) {
+  Token *head = *chain;
+
+  if (head->kind == TK_NUM) {
+    int val = head->val;
+    consume(chain);
+    return create_num(val);
+  }
+
+  consume_if_equal(chain, "(");
+  Node *node_a = expr(chain);
+  consume_if_equal(chain, ")");
+
+  return node_a;
+}
+
+//
+// Code generator
+//
+static void push(char* reg) {
+    printf("    str %s, [sp, #-16]!\n", reg);
+}
+
+static void pop(char* reg) {
+    printf("    ldr %s, [sp], #16\n", reg);
+}
+
+static void gen_expr(Node *node) {
+  if (node->kind == NK_NUM) {
+    printf("    mov x0, #%d\n", node->val);
+    return;
+  }
+
+  // evaluate rhs, then push the value in x0 on stack
+  // later on, we pop this value from the stack into x1 (since x0 is used by lhs)
+  gen_expr(node->rhs);
+  push("x0");
+  gen_expr(node->lhs);
+  pop("x1");
+
+  switch (node->kind) {
+  case NK_ADD:
+    printf("    add x0, x0, x1\n");
+    return;
+  case NK_SUB:
+    printf("    sub x0, x0, x1\n");
+    return;
+  case NK_MUL:
+    printf("    mul x0, x0, x1\n");
+    return;
+  case NK_DIV:
+    printf("    sdiv x0, x0, x1\n");
+    return;
+  default:
+    error("invalid expression");
+  }
+}
+
+//
+// main
+//
 
 int main(int argc, char **argv) {
   if (argc != 2) error("%s: invalid number of arguments\n", argv[0]);
@@ -106,32 +272,18 @@ int main(int argc, char **argv) {
   // tokenise
   Token *token = tokenise(current_input);
 
+  // parse
+  Node *ast = expr(&token);
+
+  if (token->kind != TK_EOF) error_at(token->loc, "extra token");
+
+  // generate code
   printf(".global _main\n\n");
   printf("_main:\n");
 
-  // the pattern for now would be, number punc number punc ...
-  // first token should be a num
-
-  printf("    mov x0, #%d\n", get_number(token));
-  token = token->next;
-
-  while (token->kind != TK_EOF) {
-    // get op
-    if (equal(token, "+")) {
-      printf("    add x0, x0, #%d\n", get_number(token->next));
-      token = token->next->next;
-      continue;
-    }
-
-    if (equal(token, "-")) {
-      printf("    sub x0, x0, #%d\n", get_number(token->next));
-      token = token->next->next;
-      continue;
-    }
-
-    error_at(token->loc, "invalid token!");
-  }
+  gen_expr(ast);
 
   printf("    ret\n");
+
   return 0;
 }
