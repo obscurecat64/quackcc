@@ -59,6 +59,20 @@ static Token *create_token(TokenKind kind, char *start, char *end) {
   return token;
 }
 
+static bool startswith(char *p, char *q) {
+  return strncmp(p, q, strlen(q)) == 0;
+}
+
+static int get_punct_len(char *p) {
+  if (startswith(p, "==") || startswith(p, "!=") ||
+      startswith(p, "<=") || startswith(p, ">="))
+    return 2;
+
+  if (ispunct(*p)) return 1;
+
+  return 0;
+}
+
 static Token *get_next_token(char **pp) {
   while (isspace(**pp)) (*pp)++;
 
@@ -73,8 +87,10 @@ static Token *get_next_token(char **pp) {
     return token;
   }
 
-  if (ispunct(*start)) {
-    return create_token(TK_PUNC, start, ++(*pp));
+  int punct_len = get_punct_len(start);
+  if (punct_len) {
+    (*pp) = (*pp) + punct_len;
+    return create_token(TK_PUNC, start, *pp);
   }
 
   error_at(*pp, "invalid token!");
@@ -112,6 +128,12 @@ typedef enum {
   NK_MUL,
   NK_DIV,
   NK_NEG,
+  NK_EQ,
+  NK_NE,
+  NK_LT,
+  NK_LE,
+  NK_GT,
+  NK_GE,
 } NodeKind;
 
 typedef struct Node Node;
@@ -130,10 +152,10 @@ static Node* create_binary(NodeKind kind, Node *lhs, Node *rhs) {
   return node;
 }
 
-static Node* create_unary(NodeKind kind, Node *expr) {
+static Node* create_unary(NodeKind kind, Node *lhs) {
   Node *node = calloc(1, sizeof(Token));
   node->kind = kind;
-  node->lhs = expr;
+  node->lhs = lhs;
   return node;
 }
 
@@ -154,23 +176,87 @@ static void consume(Token **chain, char *s) {
 }
 
 static Node *expr(Token **chain);
-static Node *expr_prime(Token **chain, Node *lhs);
+static Node *equality(Token **chain);
+static Node *equality_prime(Token **chain, Node *lhs);
+static Node *relational(Token **chain);
+static Node *relational_prime(Token **chain, Node *lhs);
+static Node *sum(Token **chain);
+static Node *sum_prime(Token **chain, Node *lhs);
 static Node *term(Token **chain);
 static Node *term_prime(Token **chain, Node *lhs);
 static Node *unary(Token **chain);
 static Node *factor(Token **chain);
 
-// Expr -> Term Expr'
+// Expr -> Equality
 static Node *expr(Token **chain) {
-  Node *node_a = term(chain);
-  Node *node_b = expr_prime(chain, node_a);
+  return equality(chain);
+}
+
+// Equality -> Relational Equality'
+static Node *equality(Token **chain) {
+  Node *node_a = relational(chain);
+  Node *node_b = equality_prime(chain, node_a);
 
   if (node_b == NULL) return node_a;
   return node_b;
 }
 
-// Expr' -> '+' Term Expr' | '-' Term Expr' | ε
-static Node *expr_prime(Token **chain, Node* lhs) {
+// Equality' -> "==" Relational Equality' | "!=" Relational Equality' | ε
+static Node *equality_prime(Token **chain, Node *lhs) {
+  Token *head = *chain;
+
+  if (!equal(head, "==") && !equal(head, "!=")) return NULL;
+
+  NodeKind kind = equal(head, "==") ? NK_EQ : NK_NE;
+  skip(chain);
+
+  Node *node_a = create_binary(kind, lhs, relational(chain));
+  Node *node_b = equality_prime(chain, node_a);
+
+  if (node_b == NULL) return node_a;
+  return node_b;
+}
+
+// Relational -> Sum Relational'
+static Node *relational(Token **chain) {
+  Node *node_a = sum(chain);
+  Node *node_b = relational_prime(chain, node_a);
+
+  if (node_b == NULL) return node_a;
+  return node_b;
+}
+
+// Relational' -> RELOP Sum Relational' | ε
+static Node *relational_prime(Token **chain, Node *lhs) {
+  Token *head = *chain;
+  NodeKind kind;
+
+  if (equal(head, "<")) kind = NK_LT;
+  else if (equal(head, ">")) kind = NK_GT;
+  else if (equal(head, "<=")) kind = NK_LE;
+  else if (equal(head, ">=")) kind = NK_GE;
+  else return NULL;
+
+  skip(chain);
+
+  Node *node_a = create_binary(kind, lhs, sum(chain));
+  Node *node_b = relational_prime(chain, node_a);
+
+  if (node_b == NULL) return node_a;
+  return node_b;
+}
+
+// Sum -> Term Sum'
+static Node *sum(Token **chain) {
+  Node *node_a = term(chain);
+  Node *node_b = sum_prime(chain, node_a);
+
+  if (node_b == NULL) return node_a;
+  return node_b;
+}
+
+// Sum' -> '+' Term Sum' | '-' Term Sum' | ε
+static Node *sum_prime(Token **chain, Node* lhs) {
   Token *head = *chain;
 
   if (!equal(head, "+") && !equal(head, "-")) return NULL;
@@ -179,7 +265,7 @@ static Node *expr_prime(Token **chain, Node* lhs) {
   skip(chain);
 
   Node *node_a = create_binary(kind, lhs, term(chain));
-  Node *node_b = expr_prime(chain, node_a);
+  Node *node_b = sum_prime(chain, node_a);
 
   if (node_b == NULL) return node_a;
   return node_b;
@@ -287,6 +373,36 @@ static void gen_expr(Node *node) {
     return;
   case NK_DIV:
     printf("    sdiv x0, x0, x1\n");
+    return;
+  case NK_EQ:
+    printf("    cmp x0, x1\n");
+    printf("    mov x0, #0\n");
+    printf("    cset x0, eq\n");
+    return;
+  case NK_NE:
+    printf("    cmp x0, x1\n");
+    printf("    mov x0, #0\n");
+    printf("    cset x0, ne\n");
+    return;
+  case NK_LT:
+    printf("    cmp x0, x1\n");
+    printf("    mov x0, #0\n");
+    printf("    cset x0, lt\n");
+    return;
+  case NK_LE:
+    printf("    cmp x0, x1\n");
+    printf("    mov x0, #0\n");
+    printf("    cset x0, le\n");
+    return;
+  case NK_GT:
+    printf("    cmp x0, x1\n");
+    printf("    mov x0, #0\n");
+    printf("    cset x0, gt\n");
+    return;
+  case NK_GE:
+    printf("    cmp x0, x1\n");
+    printf("    mov x0, #0\n");
+    printf("    cset x0, ge\n");
     return;
   default:
     error("invalid expression");
