@@ -2,7 +2,7 @@
 
 static Token **chain;
 
-static Node* create_binary(NodeKind kind, Node *lhs, Node *rhs) {
+static Node *create_binary(NodeKind kind, Node *lhs, Node *rhs) {
   Node *node = calloc(1, sizeof(Token));
   node->kind = kind;
   node->lhs = lhs;
@@ -10,14 +10,14 @@ static Node* create_binary(NodeKind kind, Node *lhs, Node *rhs) {
   return node;
 }
 
-static Node* create_unary(NodeKind kind, Node *lhs) {
+static Node *create_unary(NodeKind kind, Node *lhs) {
   Node *node = calloc(1, sizeof(Token));
   node->kind = kind;
   node->lhs = lhs;
   return node;
 }
 
-static Node* create_num(int val) {
+static Node *create_num(int val) {
   Node *node = calloc(1, sizeof(Token));
   node->val = val;
   return node;
@@ -33,6 +33,9 @@ static void consume(char *s) {
   skip();
 }
 
+static Node *program();
+static Node *stmt();
+static Node *expr_stmt();
 static Node *expr();
 static Node *equality();
 static Node *equality_prime(Node *lhs);
@@ -44,6 +47,31 @@ static Node *term();
 static Node *term_prime(Node *lhs);
 static Node *unary();
 static Node *factor();
+
+// Program -> Stmt+
+static Node *program() {
+  Node *head = stmt();
+  Node *curr = head;
+  while ((*chain)->kind != TK_EOF) {
+    Node *stmt_node = stmt();
+    curr->next = stmt_node;
+    curr = stmt_node;
+  }
+  curr->next = NULL;
+  return head;
+}
+
+// Stmt -> ExprStmt
+static Node *stmt() {
+  return expr_stmt();
+}
+
+// ExprStmt -> Expr ';'
+static Node *expr_stmt() {
+  Node *node = create_unary(NK_EXPR_STMT, expr());
+  consume(";");
+  return node;
+}
 
 // Expr -> Equality
 static Node *expr() {
@@ -190,7 +218,6 @@ static Node *factor() {
 
 Node *parse(Token *head) {
   chain = &head;
-  Node *ast = expr();
-  if (head->kind != TK_EOF) error_at(head->loc, "extra token");
+  Node *ast = program();
   return ast;
 }

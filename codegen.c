@@ -1,11 +1,15 @@
 #include "quackcc.h"
 
+static int depth;
+
 static void push(char* reg) {
     printf("    str %s, [sp, #-16]!\n", reg);
+    depth++;
 }
 
 static void pop(char* reg) {
     printf("    ldr %s, [sp], #16\n", reg);
+    depth--;
 }
 
 static void gen_expr(Node *node) {
@@ -76,11 +80,25 @@ static void gen_expr(Node *node) {
   }
 }
 
+static void gen_stmt(Node *node) {
+  switch (node->kind) {
+    case NK_EXPR_STMT:
+      gen_expr(node->lhs);
+      return;
+    default:
+      error("invalid statement!");
+  }
+}
+
 void codegen(Node *node) {
   printf(".global _main\n\n");
   printf("_main:\n");
 
-  gen_expr(node);
+  while (node != NULL) {
+    gen_stmt(node);
+    node = node->next;
+    assert(depth == 0);
+  }
 
   printf("    ret\n");
 }

@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -18,7 +19,7 @@ void error(char *fmt, ...);
 typedef enum {
   TK_NUM,
   TK_PUNC,
-  TK_EOF
+  TK_EOF,
 } TokenKind;
 
 typedef struct Token Token;
@@ -51,6 +52,7 @@ typedef enum {
   NK_LE,
   NK_GT,
   NK_GE,
+  NK_EXPR_STMT,
 } NodeKind;
 
 typedef struct Node Node;
@@ -58,6 +60,7 @@ struct Node {
   NodeKind kind;
   Node *lhs;
   Node *rhs;
+  Node *next;
   int val;
 };
 
