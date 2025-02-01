@@ -3,7 +3,7 @@
 static Token **chain;
 
 static Node *create_binary(NodeKind kind, Node *lhs, Node *rhs) {
-  Node *node = calloc(1, sizeof(Token));
+  Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
   node->lhs = lhs;
   node->rhs = rhs;
@@ -11,14 +11,14 @@ static Node *create_binary(NodeKind kind, Node *lhs, Node *rhs) {
 }
 
 static Node *create_unary(NodeKind kind, Node *lhs) {
-  Node *node = calloc(1, sizeof(Token));
+  Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
   node->lhs = lhs;
   return node;
 }
 
 static Node *create_num(int val) {
-  Node *node = calloc(1, sizeof(Token));
+  Node *node = calloc(1, sizeof(Node));
   node->val = val;
   return node;
 }
