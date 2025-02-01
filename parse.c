@@ -19,6 +19,7 @@ static Node *create_unary(NodeKind kind, Node *lhs) {
 
 static Node *create_num(int val) {
   Node *node = calloc(1, sizeof(Node));
+  node->kind = NK_NUM;
   node->val = val;
   return node;
 }
