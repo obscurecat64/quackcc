@@ -20,6 +20,7 @@ typedef enum {
   TK_NUM,
   TK_PUNC,
   TK_EOF,
+  TK_IDENT,
 } TokenKind;
 
 typedef struct Token Token;
@@ -53,6 +54,8 @@ typedef enum {
   NK_GT,
   NK_GE,
   NK_EXPR_STMT,
+  NK_VAR,
+  NK_ASSIGN,
 } NodeKind;
 
 typedef struct Node Node;
@@ -62,6 +65,7 @@ struct Node {
   Node *rhs;
   Node *next;
   int val;
+  char name;
 };
 
 Node *parse(Token *head);

@@ -24,6 +24,13 @@ static Node *create_num(int val) {
   return node;
 }
 
+static Node *create_var(char name) {
+  Node *node = calloc(1, sizeof(Node));
+  node->kind = NK_VAR;
+  node->name = name;
+  return node;
+}
+
 static void skip() {
   *chain = (*chain)->next;
 }
@@ -38,6 +45,7 @@ static Node *program();
 static Node *stmt();
 static Node *expr_stmt();
 static Node *expr();
+static Node *assign();
 static Node *equality();
 static Node *equality_prime(Node *lhs);
 static Node *relational();
@@ -74,9 +82,32 @@ static Node *expr_stmt() {
   return node;
 }
 
-// Expr -> Equality
+// Expr -> Equality | Assign
 static Node *expr() {
+  Token *head = *chain;
+  Token *lookahead = head->next;
+
+  if (head->kind == TK_IDENT && lookahead->kind == TK_PUNC &&
+      equal(lookahead, "=")) {
+    return assign();
+  }
+
   return equality();
+}
+
+// Assign -> Ident '=' Expr
+static Node *assign() {
+  Token *head = *chain;
+
+  if (head->kind != TK_IDENT)
+    error_at(head->loc, "expected identifier as left-hand side of assignment");
+
+  Node *node_a = create_var(*(head->loc));
+  skip();
+  consume("=");
+  Node *node_b = expr();
+
+  return create_binary(NK_ASSIGN, node_a, node_b);
 }
 
 // Equality -> Relational Equality'
@@ -200,7 +231,7 @@ static Node *unary() {
   return factor();
 }
 
-// Factor -> Number | ( Expr )
+// Factor -> Number | ( Expr ) | Ident
 static Node *factor() {
   Token *head = *chain;
 
@@ -208,6 +239,12 @@ static Node *factor() {
     int val = head->val;
     skip();
     return create_num(val);
+  }
+
+  if (head->kind == TK_IDENT) {
+    char name = *(head->loc);
+    skip();
+    return create_var(name);
   }
 
   consume("(");

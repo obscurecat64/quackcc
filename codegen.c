@@ -12,6 +12,14 @@ static void pop(char* reg) {
     depth--;
 }
 
+static void gen_addr(Node *node) {
+  if (node->kind != NK_VAR) error("not an lvalue");
+
+  int offset = (node->name - 'a' + 1) * 16;
+  printf("    sub x0, fp, #%d\n", offset);
+  return;
+}
+
 static void gen_expr(Node *node) {
   if (node->kind == NK_NUM) {
     printf("    mov x0, #%d\n", node->val);
@@ -24,7 +32,21 @@ static void gen_expr(Node *node) {
     return;
   }
 
-  // binary
+  if (node->kind == NK_VAR) {
+    gen_addr(node);
+    printf("    ldr x0, [x0]\n");
+    return;
+  }
+
+  if (node->kind == NK_ASSIGN) {
+    gen_expr(node->rhs);
+    push("x0");
+    gen_addr(node->lhs);
+    pop("x1");
+    printf("    str x1, [x0]\n");
+    return;
+  }
+
   // evaluate rhs, then push the value in x0 on stack
   // later on, we pop this value from the stack into x1 (since x0 is used by lhs)
   gen_expr(node->rhs);
@@ -93,6 +115,11 @@ static void gen_stmt(Node *node) {
 void codegen(Node *node) {
   printf(".global _main\n\n");
   printf("_main:\n");
+  
+  // prologue
+  printf("    str fp, [sp, #-16]!\n");
+  printf("    mov fp, sp\n");
+  printf("    sub sp, sp, #416\n"); // 26 * 16 = 416; make room for vars a-z
 
   while (node != NULL) {
     gen_stmt(node);
@@ -100,5 +127,8 @@ void codegen(Node *node) {
     assert(depth == 0);
   }
 
+  // epilogue
+  printf("    add sp, fp, #16\n");
+  printf("    ldr fp, [fp]\n");
   printf("    ret\n");
 }

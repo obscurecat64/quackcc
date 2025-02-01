@@ -52,4 +52,8 @@ assert 1 '0 == 1 != 1;'
 assert 1 '3;2;1;'
 assert 3 '1;2;3;'
 
+assert 3 'a=3; a;'
+assert 0 'x=y=10; x-y==0;'
+assert 1 'x=5; x == 5;'
+
 echo OK

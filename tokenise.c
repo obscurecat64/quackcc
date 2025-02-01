@@ -60,6 +60,13 @@ static Token *get_next_token(char **pp) {
     return create_token(TK_PUNC, start, *pp);
   }
 
+  if (isalpha(*start)) {
+    char name = *start;
+    Token * token = create_token(TK_IDENT, start, *pp + 1);
+    (*pp)++;
+    return token;
+  }
+
   error_at(*pp, "invalid token!");
   return NULL;
 }
