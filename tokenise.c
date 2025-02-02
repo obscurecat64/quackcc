@@ -50,6 +50,18 @@ static int get_ident_len(char *c) {
   return c - start;
 }
 
+static int get_keyword_len(char *p) {
+  char *keywords[] = {"return"};
+  int len = sizeof(keywords) / sizeof(char*);
+
+  for (int i = 0; i < len; i++) {
+    char *keyword = keywords[i];
+    if (startswith(p, keyword)) return strlen(keyword);
+  }
+
+  return 0;
+}
+
 static Token *get_next_token(char **pp) {
   while (isspace(**pp)) (*pp)++;
 
@@ -68,6 +80,12 @@ static Token *get_next_token(char **pp) {
   if (punct_len) {
     (*pp) = (*pp) + punct_len;
     return create_token(TK_PUNC, start, *pp);
+  }
+
+  int keyword_len = get_keyword_len(start);
+  if (keyword_len) {
+    (*pp) = (*pp) + keyword_len;
+    return create_token(TK_KEYWORD, start, *pp);
   }
 
   int ident_len = get_ident_len(start);

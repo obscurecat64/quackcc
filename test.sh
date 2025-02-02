@@ -58,4 +58,10 @@ assert 1 'x=5; x == 5;'
 assert 7 'my_num = 7; my_num;'
 assert 8 'foo123=3; bar=5; foo123+bar;'
 
+assert 1 'return 1;';
+assert 4 'return 2 + 2;';
+assert 1 'return 1; 2; 3;'
+assert 2 '1; return 2; 3;'
+assert 3 '1; 2; return 3;'
+
 echo OK

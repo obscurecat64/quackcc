@@ -86,9 +86,16 @@ static Node *program() {
   return head;
 }
 
-// Stmt -> ExprStmt
+// Stmt -> ExprStmt | 'return' Expr ';'
 static Node *stmt() {
-  return expr_stmt();
+  Token *head = *chain;
+
+  if (head->kind != TK_KEYWORD) return expr_stmt();
+
+  consume("return");
+  Node *node = create_unary(NK_RETURN_STMT, expr());
+  consume(";");
+  return node;
 }
 
 // ExprStmt -> Expr ';'

@@ -1,11 +1,12 @@
-CFLAGS=-std=c11 -g -fno-common
+CFLAGS=-std=c11 -g -fno-common -Wall
 SRCS=$(wildcard *.c)
 OBJS=$(SRCS:.c=.o)
 
 quackcc: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-$(OBJS): quackcc.h
+%.o: %.c quackcc.h
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 test: quackcc
 	./test.sh

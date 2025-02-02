@@ -104,6 +104,10 @@ static void gen_stmt(Node *node) {
     case NK_EXPR_STMT:
       gen_expr(node->lhs);
       return;
+    case NK_RETURN_STMT:
+      gen_expr(node->lhs);
+      printf("    b return\n");
+      return;
     default:
       error("invalid statement!");
   }
@@ -139,6 +143,7 @@ void codegen(Fun *prog) {
   }
 
   // epilogue
+  printf("return:\n");
   printf("    add sp, fp, #16\n");
   printf("    ldr fp, [fp]\n");
   printf("    ret\n");
