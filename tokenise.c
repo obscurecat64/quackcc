@@ -83,11 +83,6 @@ Token *tokenise(char *p) {
   return head.next;
 }
 
-static int get_number(Token *token) {
-  if (token->kind != TK_NUM) error_at(token->loc, "expected a number");
-  return token->val;
-}
-
 bool equal(Token *token, char *s) {
   return memcmp(token->loc, s, token->len) == 0 && s[token->len] == '\0';
 }
