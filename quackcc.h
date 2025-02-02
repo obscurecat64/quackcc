@@ -58,6 +58,13 @@ typedef enum {
   NK_ASSIGN,
 } NodeKind;
 
+typedef struct Obj Obj;
+struct Obj {
+  Obj *next;
+  char *name;
+  int offset;
+};
+
 typedef struct Node Node;
 struct Node {
   NodeKind kind;
@@ -65,13 +72,20 @@ struct Node {
   Node *rhs;
   Node *next;
   int val;
-  char name;
+  Obj *var;
 };
 
-Node *parse(Token *head);
+typedef struct Fun Fun;
+struct Fun {
+  Node *body;
+  Obj *locals;
+  int stack_size;
+};
+
+Fun *parse(Token *head);
 
 //
 // parse.c
 //
 
-void codegen(Node *node);
+void codegen(Fun *prog);

@@ -40,6 +40,16 @@ static int get_punct_len(char *p) {
   return 0;
 }
 
+static int get_ident_len(char *c) {
+  char *start = c;
+
+  if (!isalpha(*start) && *start != '_') return 0;
+  c++;
+  while (isalnum(*c) || *c == '_') c++;
+
+  return c - start;
+}
+
 static Token *get_next_token(char **pp) {
   while (isspace(**pp)) (*pp)++;
 
@@ -60,11 +70,10 @@ static Token *get_next_token(char **pp) {
     return create_token(TK_PUNC, start, *pp);
   }
 
-  if (isalpha(*start)) {
-    char name = *start;
-    Token * token = create_token(TK_IDENT, start, *pp + 1);
-    (*pp)++;
-    return token;
+  int ident_len = get_ident_len(start);
+  if (ident_len) {
+    (*pp) = (*pp) + ident_len;
+    return create_token(TK_IDENT, start, *pp);
   }
 
   error_at(*pp, "invalid token!");

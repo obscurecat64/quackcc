@@ -1,6 +1,7 @@
 #include "quackcc.h"
 
 static Token **chain;
+static Obj *locals;
 
 static Node *create_binary(NodeKind kind, Node *lhs, Node *rhs) {
   Node *node = calloc(1, sizeof(Node));
@@ -24,10 +25,25 @@ static Node *create_num(int val) {
   return node;
 }
 
-static Node *create_var(char name) {
+static Obj *register_local(char *name) {
+  Obj *obj = calloc(1, sizeof(Obj));
+  obj->name = name;
+  obj->next = locals;
+  locals = obj;
+  return obj;
+}
+
+static Obj *find_var(char *name) {
+  for (Obj *var = locals; var; var = var->next) {
+    if (strcmp(var->name, name) == 0) return var;
+  }
+  return NULL;
+}
+
+static Node *create_var(Obj *var) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = NK_VAR;
-  node->name = name;
+  node->var = var;
   return node;
 }
 
@@ -102,7 +118,10 @@ static Node *assign() {
   if (head->kind != TK_IDENT)
     error_at(head->loc, "expected identifier as left-hand side of assignment");
 
-  Node *node_a = create_var(*(head->loc));
+  char *name = strndup(head->loc, head->len);
+  Obj *var = find_var(name);
+  if (var == NULL) var = register_local(name);
+  Node *node_a = create_var(var);
   skip();
   consume("=");
   Node *node_b = expr();
@@ -242,20 +261,28 @@ static Node *factor() {
   }
 
   if (head->kind == TK_IDENT) {
-    char name = *(head->loc);
+    char *name = strndup(head->loc, head->len);
+    Obj *var = find_var(name);
+    // here we have some additional logic in the parsing step
+    // probably will be extracted out to the preprocessing step later on
+    if (var == NULL) error_at(head->loc, "Accessing variable not yet declared");
+    Node *node = create_var(var);
     skip();
-    return create_var(name);
+    return node;
   }
 
   consume("(");
-  Node *node_a = expr();
+  Node *node = expr();
   consume(")");
 
-  return node_a;
+  return node;
 }
 
-Node *parse(Token *head) {
+Fun *parse(Token *head) {
   chain = &head;
-  Node *ast = program();
-  return ast;
+  Node *body = program();
+  Fun *fun = calloc(1, sizeof(Fun));
+  fun->body = body;
+  fun->locals = locals;
+  return fun;
 }

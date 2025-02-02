@@ -14,10 +14,7 @@ static void pop(char* reg) {
 
 static void gen_addr(Node *node) {
   if (node->kind != NK_VAR) error("not an lvalue");
-
-  int offset = (node->name - 'a' + 1) * 16;
-  printf("    sub x0, fp, #%d\n", offset);
-  return;
+  printf("    sub x0, fp, #%d\n", node->var->offset);
 }
 
 static void gen_expr(Node *node) {
@@ -112,18 +109,32 @@ static void gen_stmt(Node *node) {
   }
 }
 
-void codegen(Node *node) {
+static int align_to(int n, int align) {
+  return (n + align - 1) / align * align;
+}
+
+static void assign_lvar_offsets(Fun *fun) {
+  int offset = 0;
+  for (Obj *var = fun->locals; var; var = var->next) {
+    offset += 8;
+    var->offset = -offset;
+  }
+  fun->stack_size = align_to(offset, 16);
+}
+
+void codegen(Fun *prog) {
+  assign_lvar_offsets(prog);
+
   printf(".global _main\n\n");
   printf("_main:\n");
   
   // prologue
   printf("    str fp, [sp, #-16]!\n");
   printf("    mov fp, sp\n");
-  printf("    sub sp, sp, #416\n"); // 26 * 16 = 416; make room for vars a-z
+  printf("    sub sp, sp, #%d\n", prog->stack_size);
 
-  while (node != NULL) {
-    gen_stmt(node);
-    node = node->next;
+  for (Node *stmt = prog->body; stmt; stmt = stmt->next) {
+    gen_stmt(stmt);
     assert(depth == 0);
   }
 

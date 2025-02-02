@@ -55,5 +55,7 @@ assert 3 '1;2;3;'
 assert 3 'a=3; a;'
 assert 0 'x=y=10; x-y==0;'
 assert 1 'x=5; x == 5;'
+assert 7 'my_num = 7; my_num;'
+assert 8 'foo123=3; bar=5; foo123+bar;'
 
 echo OK
