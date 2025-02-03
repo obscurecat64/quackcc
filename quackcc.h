@@ -57,6 +57,8 @@ typedef enum {
   NK_EXPR_STMT,
   NK_VAR,
   NK_ASSIGN,
+  NK_COMPOUND_STMT,
+  NK_NULL_STMT,
   NK_RETURN_STMT,
 } NodeKind;
 
@@ -75,6 +77,7 @@ struct Node {
   Node *next;
   int val;
   Obj *var;
+  Node *body;
 };
 
 typedef struct Fun Fun;

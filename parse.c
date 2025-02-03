@@ -3,25 +3,34 @@
 static Token **chain;
 static Obj *locals;
 
-static Node *create_binary(NodeKind kind, Node *lhs, Node *rhs) {
+static Node *create_node(NodeKind kind) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
+  return node;
+}
+
+static Node *create_binary(NodeKind kind, Node *lhs, Node *rhs) {
+  Node *node = create_node(kind);
   node->lhs = lhs;
   node->rhs = rhs;
   return node;
 }
 
 static Node *create_unary(NodeKind kind, Node *lhs) {
-  Node *node = calloc(1, sizeof(Node));
-  node->kind = kind;
+  Node *node = create_node(kind);
   node->lhs = lhs;
   return node;
 }
 
 static Node *create_num(int val) {
-  Node *node = calloc(1, sizeof(Node));
-  node->kind = NK_NUM;
+  Node *node = create_node(NK_NUM);
   node->val = val;
+  return node;
+}
+
+static Node *create_var(Obj *var) {
+  Node *node = create_node(NK_VAR);
+  node->var = var;
   return node;
 }
 
@@ -40,13 +49,6 @@ static Obj *find_var(char *name) {
   return NULL;
 }
 
-static Node *create_var(Obj *var) {
-  Node *node = calloc(1, sizeof(Node));
-  node->kind = NK_VAR;
-  node->var = var;
-  return node;
-}
-
 static void skip() {
   *chain = (*chain)->next;
 }
@@ -59,6 +61,9 @@ static void consume(char *s) {
 
 static Node *program();
 static Node *stmt();
+static Node *compound_stmt();
+static Node *null_stmt();
+static Node *return_stmt();
 static Node *expr_stmt();
 static Node *expr();
 static Node *assign();
@@ -73,25 +78,67 @@ static Node *term_prime(Node *lhs);
 static Node *unary();
 static Node *factor();
 
-// Program -> Stmt+
+static bool can_start_stmt() {
+  Token *head = *chain;
+
+  if (head->kind == TK_IDENT || head->kind == TK_NUM) return true;
+  if (head->kind == TK_KEYWORD && equal(head, "return")) return true;
+  if (head->kind == TK_PUNC) {
+    // can start compound and null stmt
+    if (equal(head, "{") || equal(head, ";")) return true;
+    // can start expr stmt
+    if (equal(head, "(") || equal(head, "+") || equal(head, "-")) return true;
+  }
+  return false;
+}
+
+// Program -> CompoundStmt EOF
 static Node *program() {
-  Node *head = stmt();
-  Node *curr = head;
-  while ((*chain)->kind != TK_EOF) {
+  Node *node = compound_stmt();
+  if ((*chain)->kind != TK_EOF) {
+    char *token_str = strndup((*chain)->loc, (*chain)->len);
+    error_at((*chain)->loc, "unexpected '%s'", token_str);
+  }
+  return node;
+}
+
+// Stmt -> ExprStmt | CompoundStmt | NullStmt | ReturnStmt
+static Node *stmt() {
+  Token *head = *chain;
+
+  if (head->kind == TK_KEYWORD && equal(head, "return")) return return_stmt();
+  if (head->kind == TK_PUNC) {
+    if (equal(head, "{")) return compound_stmt();
+    if (equal(head, ";")) return null_stmt();
+  }
+  return expr_stmt();
+}
+
+// CompoundStmt -> '{' Stmt* '}'
+static Node *compound_stmt() {
+  consume("{");
+  Node temp = {};
+  Node *curr = &temp;
+  while (can_start_stmt()) {
     Node *stmt_node = stmt();
     curr->next = stmt_node;
     curr = stmt_node;
   }
-  curr->next = NULL;
-  return head;
+  Node *node = create_node(NK_COMPOUND_STMT);
+  node->body = temp.next;
+  consume("}");
+  return node;
 }
 
-// Stmt -> ExprStmt | 'return' Expr ';'
-static Node *stmt() {
-  Token *head = *chain;
+// NullStmt -> ';'
+static Node *null_stmt() {
+  consume(";");
+  Node *node = create_node(NK_NULL_STMT);
+  return node;
+}
 
-  if (head->kind != TK_KEYWORD) return expr_stmt();
-
+// ReturnStmt -> 'return' Expr ';'
+static Node *return_stmt() {
   consume("return");
   Node *node = create_unary(NK_RETURN_STMT, expr());
   consume(";");

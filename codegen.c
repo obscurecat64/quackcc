@@ -108,6 +108,15 @@ static void gen_stmt(Node *node) {
       gen_expr(node->lhs);
       printf("    b return\n");
       return;
+    case NK_COMPOUND_STMT:
+      for (Node *stmt = node->body; stmt; stmt = stmt->next) {
+        gen_stmt(stmt);
+        assert(depth == 0);
+      }
+      return;
+    case NK_NULL_STMT:
+      // do nothing
+      return;
     default:
       error("invalid statement!");
   }
@@ -137,10 +146,7 @@ void codegen(Fun *prog) {
   printf("    mov fp, sp\n");
   printf("    sub sp, sp, #%d\n", prog->stack_size);
 
-  for (Node *stmt = prog->body; stmt; stmt = stmt->next) {
-    gen_stmt(stmt);
-    assert(depth == 0);
-  }
+  gen_stmt(prog->body);
 
   // epilogue
   printf("return:\n");
