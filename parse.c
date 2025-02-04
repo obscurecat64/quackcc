@@ -123,7 +123,7 @@ static Node *stmt() {
   return expr_stmt();
 }
 
-// IfStmt -> 'if' '(' expr ')' Stmt 'else' Stmt
+// IfStmt -> 'if' '(' Expr ')' Stmt ('else' Stmt)?
 static Node *if_stmt() {
   Node *node = create_node(NK_IF_STMT);
   consume("if");
