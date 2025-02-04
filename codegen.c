@@ -2,6 +2,11 @@
 
 static int depth;
 
+static int get_label_count() {
+  static int i = 1;
+  return i++;
+}
+
 static void push(char* reg) {
     printf("    str %s, [sp, #-16]!\n", reg);
     depth++;
@@ -116,6 +121,28 @@ static void gen_stmt(Node *node) {
       return;
     case NK_NULL_STMT:
       // do nothing
+      return;
+    case NK_IF_STMT:
+      if (node->rhs == NULL) {
+        int c = get_label_count();
+        gen_expr(node->cond);
+        printf("    cmp x0, #0\n");
+        printf("    beq .L%d\n", c);
+        gen_stmt(node->lhs);
+        printf(".L%d:\n", c);
+        return;
+      }
+
+      int c1 = get_label_count();
+      int c2 = get_label_count();
+      gen_expr(node->cond);
+      printf("    cmp x0, #0\n");
+      printf("    beq .L%d\n", c1);
+      gen_stmt(node->lhs);
+      printf("    b .L%d\n", c2);
+      printf(".L%d:\n", c1);
+      gen_stmt(node->rhs);
+      printf(".L%d:\n", c2);
       return;
     default:
       error("invalid statement!");

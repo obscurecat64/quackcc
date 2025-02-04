@@ -60,6 +60,7 @@ typedef enum {
   NK_COMPOUND_STMT,
   NK_NULL_STMT,
   NK_RETURN_STMT,
+  NK_IF_STMT,
 } NodeKind;
 
 typedef struct Obj Obj;
@@ -78,6 +79,7 @@ struct Node {
   int val;
   Obj *var;
   Node *body;
+  Node *cond;
 };
 
 typedef struct Fun Fun;

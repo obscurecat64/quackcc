@@ -61,6 +61,7 @@ static void consume(char *s) {
 
 static Node *program();
 static Node *stmt();
+static Node *if_stmt();
 static Node *compound_stmt();
 static Node *null_stmt();
 static Node *return_stmt();
@@ -82,13 +83,18 @@ static bool can_start_stmt() {
   Token *head = *chain;
 
   if (head->kind == TK_IDENT || head->kind == TK_NUM) return true;
-  if (head->kind == TK_KEYWORD && equal(head, "return")) return true;
+
+  if (head->kind == TK_KEYWORD) {
+    if (equal(head, "return") || equal(head, "if")) return true;
+  }
+
   if (head->kind == TK_PUNC) {
     // can start compound and null stmt
     if (equal(head, "{") || equal(head, ";")) return true;
     // can start expr stmt
     if (equal(head, "(") || equal(head, "+") || equal(head, "-")) return true;
   }
+
   return false;
 }
 
@@ -102,16 +108,36 @@ static Node *program() {
   return node;
 }
 
-// Stmt -> ExprStmt | CompoundStmt | NullStmt | ReturnStmt
+// Stmt -> ExprStmt | CompoundStmt | NullStmt | ReturnStmt | IfStmt
 static Node *stmt() {
   Token *head = *chain;
 
-  if (head->kind == TK_KEYWORD && equal(head, "return")) return return_stmt();
+  if (head->kind == TK_KEYWORD) {
+    if (equal(head, "return")) return return_stmt();
+    if (equal(head, "if")) return if_stmt();
+  }
   if (head->kind == TK_PUNC) {
     if (equal(head, "{")) return compound_stmt();
     if (equal(head, ";")) return null_stmt();
   }
   return expr_stmt();
+}
+
+// IfStmt -> 'if' '(' expr ')' Stmt 'else' Stmt
+static Node *if_stmt() {
+  Node *node = create_node(NK_IF_STMT);
+  consume("if");
+  consume("(");
+  node->cond = expr();
+  consume(")");
+  node->lhs = stmt();
+
+  Token *head = *chain;
+  if (head->kind != TK_KEYWORD || !equal(head, "else")) return node;
+
+  consume("else");
+  node->rhs = stmt();
+  return node;
 }
 
 // CompoundStmt -> '{' Stmt* '}'
