@@ -19,7 +19,7 @@ static void pop(char* reg) {
 
 static void gen_addr(Node *node) {
   if (node->kind != NK_VAR) error("not an lvalue");
-  printf("    sub x0, fp, #%d\n", node->var->offset);
+  printf("    add x0, fp, #%d\n", node->var->offset);
 }
 
 static void gen_expr(Node *node) {
