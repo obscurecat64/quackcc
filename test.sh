@@ -76,5 +76,9 @@ assert 4 '{ if (0) { 1; 2; return 3; } else { return 4; } }'
 assert 3 '{ if (1) { 1; 2; return 3; } else { return 4; } }'
 assert 5 '{ if (1) ; 5; }'
 
+assert 5 '{ for (i = 1; i < 5; i = i + 1); return i; }'
+assert 8 '{ i = 2; j = 0; for (; i < 10; i = i + 1) j = j + 1; return j; }'
+assert 55 '{ i=0; j=0; for (i=0; i<=10; i=i+1) j=i+j; return j; }'
+assert 3 '{ for (;;) {return 3;} return 5; }'
 
 echo OK

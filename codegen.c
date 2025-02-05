@@ -122,7 +122,7 @@ static void gen_stmt(Node *node) {
     case NK_NULL_STMT:
       // do nothing
       return;
-    case NK_IF_STMT:
+    case NK_IF_STMT: {
       if (node->rhs == NULL) {
         int c = get_label_count();
         gen_expr(node->cond);
@@ -144,6 +144,23 @@ static void gen_stmt(Node *node) {
       gen_stmt(node->rhs);
       printf(".L%d:\n", c2);
       return;
+    }
+    case NK_FOR_STMT: {
+      int c1 = get_label_count();
+      int c2 = get_label_count();
+      if (node->lhs != NULL) gen_expr(node->lhs);
+      printf(".L%d:\n", c1);
+      if (node->cond != NULL) {
+        gen_expr(node->cond);
+        printf("    cmp x0, #0\n");
+        printf("    beq .L%d\n", c2);
+      }
+      gen_stmt(node->body);
+      if (node->rhs != NULL) gen_expr(node->rhs);
+      printf("    b .L%d\n", c1);
+      printf(".L%d:\n", c2);
+      return;
+    }
     default:
       error("invalid statement!");
   }

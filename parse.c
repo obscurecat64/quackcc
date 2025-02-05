@@ -62,6 +62,7 @@ static void consume(char *s) {
 static Node *program();
 static Node *stmt();
 static Node *if_stmt();
+static Node *for_stmt();
 static Node *compound_stmt();
 static Node *null_stmt();
 static Node *return_stmt();
@@ -85,7 +86,8 @@ static bool can_start_stmt() {
   if (head->kind == TK_IDENT || head->kind == TK_NUM) return true;
 
   if (head->kind == TK_KEYWORD) {
-    if (equal(head, "return") || equal(head, "if")) return true;
+    if (equal(head, "return") || equal(head, "if") || equal(head, "for"))
+      return true;
   }
 
   if (head->kind == TK_PUNC) {
@@ -108,13 +110,14 @@ static Node *program() {
   return node;
 }
 
-// Stmt -> ExprStmt | CompoundStmt | NullStmt | ReturnStmt | IfStmt
+// Stmt -> ExprStmt | CompoundStmt | NullStmt | ReturnStmt | IfStmt | ForStmt
 static Node *stmt() {
   Token *head = *chain;
 
   if (head->kind == TK_KEYWORD) {
     if (equal(head, "return")) return return_stmt();
     if (equal(head, "if")) return if_stmt();
+    if (equal(head, "for")) return for_stmt();
   }
   if (head->kind == TK_PUNC) {
     if (equal(head, "{")) return compound_stmt();
@@ -138,6 +141,30 @@ static Node *if_stmt() {
   consume("else");
   node->rhs = stmt();
   return node;
+}
+
+// ForStmt -> 'for' '(' Expr? ';' Expr? ';' Expr? ')' Stmt
+static Node *for_stmt() {
+  Node *init_node = NULL;
+  Node *cond_node = NULL;
+  Node *update_node = NULL;
+  consume("for");
+  consume("(");
+  if (!equal((*chain), ";")) init_node = expr();
+  consume(";");
+  if (!equal((*chain), ";")) cond_node = expr();
+  consume(";");
+  if (!equal((*chain), ")")) update_node = expr();
+  consume(")");
+  Node *body_node = stmt();
+
+  Node *for_node = create_node(NK_FOR_STMT);
+  for_node->lhs = init_node;
+  for_node->cond = cond_node;
+  for_node->rhs = update_node;
+  for_node->body = body_node;
+
+  return for_node;
 }
 
 // CompoundStmt -> '{' Stmt* '}'
