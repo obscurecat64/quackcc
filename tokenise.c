@@ -51,7 +51,7 @@ static int get_ident_len(char *c) {
 }
 
 static int get_keyword_len(char *p) {
-  char *keywords[] = {"return", "if", "else", "for"};
+  char *keywords[] = {"return", "if", "else", "for", "while"};
   int len = sizeof(keywords) / sizeof(char*);
 
   for (int i = 0; i < len; i++) {

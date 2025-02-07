@@ -2,9 +2,11 @@
 
 static int depth;
 
-static int get_label_count() {
+static char *gen_label_name() {
   static int i = 1;
-  return i++;
+  char *label = malloc(16);
+  snprintf(label, 16, ".L%d", i++);
+  return label;
 }
 
 static void push(char* reg) {
@@ -124,41 +126,53 @@ static void gen_stmt(Node *node) {
       return;
     case NK_IF_STMT: {
       if (node->rhs == NULL) {
-        int c = get_label_count();
+        char *l = gen_label_name();
         gen_expr(node->cond);
         printf("    cmp x0, #0\n");
-        printf("    beq .L%d\n", c);
+        printf("    beq %s\n", l);
         gen_stmt(node->lhs);
-        printf(".L%d:\n", c);
+        printf("%s:\n", l);
         return;
       }
 
-      int c1 = get_label_count();
-      int c2 = get_label_count();
+      char *l1 = gen_label_name();
+      char *l2 = gen_label_name();
       gen_expr(node->cond);
       printf("    cmp x0, #0\n");
-      printf("    beq .L%d\n", c1);
+      printf("    beq %s\n", l1);
       gen_stmt(node->lhs);
-      printf("    b .L%d\n", c2);
-      printf(".L%d:\n", c1);
+      printf("    b %s\n", l2);
+      printf("%s:\n", l1);
       gen_stmt(node->rhs);
-      printf(".L%d:\n", c2);
+      printf("%s:\n", l2);
+      return;
+    }
+    case NK_WHILE_STMT: {
+      char *l1 = gen_label_name();
+      char *l2 = gen_label_name();
+      printf("%s:\n", l1);
+      gen_expr(node->cond);
+      printf("    cmp x0, #0\n");
+      printf("    beq %s\n", l2);
+      gen_stmt(node->body);
+      printf("    b %s\n", l1);
+      printf("%s:\n", l2);
       return;
     }
     case NK_FOR_STMT: {
-      int c1 = get_label_count();
-      int c2 = get_label_count();
+      char *l1 = gen_label_name();
+      char *l2 = gen_label_name();
       if (node->lhs != NULL) gen_expr(node->lhs);
-      printf(".L%d:\n", c1);
+      printf("%s:\n", l1);
       if (node->cond != NULL) {
         gen_expr(node->cond);
         printf("    cmp x0, #0\n");
-        printf("    beq .L%d\n", c2);
+        printf("    beq %s\n", l2);
       }
       gen_stmt(node->body);
       if (node->rhs != NULL) gen_expr(node->rhs);
-      printf("    b .L%d\n", c1);
-      printf(".L%d:\n", c2);
+      printf("    b %s\n", l1);
+      printf("%s:\n", l2);
       return;
     }
     default:

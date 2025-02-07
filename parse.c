@@ -62,6 +62,7 @@ static void consume(char *s) {
 static Node *program();
 static Node *stmt();
 static Node *if_stmt();
+static Node *while_stmt();
 static Node *for_stmt();
 static Node *compound_stmt();
 static Node *null_stmt();
@@ -86,7 +87,8 @@ static bool can_start_stmt() {
   if (head->kind == TK_IDENT || head->kind == TK_NUM) return true;
 
   if (head->kind == TK_KEYWORD) {
-    if (equal(head, "return") || equal(head, "if") || equal(head, "for"))
+    if (equal(head, "return") || equal(head, "if") || equal(head, "for") ||
+        equal(head, "while"))
       return true;
   }
 
@@ -118,6 +120,7 @@ static Node *stmt() {
     if (equal(head, "return")) return return_stmt();
     if (equal(head, "if")) return if_stmt();
     if (equal(head, "for")) return for_stmt();
+    if (equal(head, "while")) return while_stmt();
   }
   if (head->kind == TK_PUNC) {
     if (equal(head, "{")) return compound_stmt();
@@ -140,6 +143,17 @@ static Node *if_stmt() {
 
   consume("else");
   node->rhs = stmt();
+  return node;
+}
+
+// WhileStmt -> 'while' '(' Expr ')' Stmt
+static Node *while_stmt() {
+  Node *node = create_node(NK_WHILE_STMT);
+  consume("while");
+  consume("(");
+  node->cond = expr();
+  consume(")");
+  node->body = stmt();
   return node;
 }
 

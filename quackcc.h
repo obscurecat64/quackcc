@@ -61,6 +61,7 @@ typedef enum {
   NK_NULL_STMT,
   NK_RETURN_STMT,
   NK_IF_STMT,
+  NK_WHILE_STMT,
   NK_FOR_STMT,
 } NodeKind;
 
