@@ -82,6 +82,7 @@ struct Node {
   Obj *var;
   Node *body;
   Node *cond;
+  Token *token;
 };
 
 typedef struct Fun Fun;

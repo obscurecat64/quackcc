@@ -20,7 +20,7 @@ static void pop(char* reg) {
 }
 
 static void gen_addr(Node *node) {
-  if (node->kind != NK_VAR) error("not an lvalue");
+  if (node->kind != NK_VAR) error_at(node->token->loc, "not an lvalue");
   printf("    add x0, fp, #%d\n", node->var->offset);
 }
 
@@ -102,7 +102,7 @@ static void gen_expr(Node *node) {
     printf("    cset x0, ge\n");
     return;
   default:
-    error("invalid expression!");
+    error_at(node->token->loc, "invalid expression");
   }
 }
 
@@ -176,7 +176,7 @@ static void gen_stmt(Node *node) {
       return;
     }
     default:
-      error("invalid statement!");
+      error_at(node->token->loc, "invalid statement");
   }
 }
 

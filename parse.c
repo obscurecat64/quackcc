@@ -3,33 +3,34 @@
 static Token **chain;
 static Obj *locals;
 
-static Node *create_node(NodeKind kind) {
+static Node *create_node(NodeKind kind, Token *token) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
+  node->token = token;
   return node;
 }
 
-static Node *create_binary(NodeKind kind, Node *lhs, Node *rhs) {
-  Node *node = create_node(kind);
+static Node *create_binary(NodeKind kind, Node *lhs, Node *rhs, Token *token) {
+  Node *node = create_node(kind, token);
   node->lhs = lhs;
   node->rhs = rhs;
   return node;
 }
 
-static Node *create_unary(NodeKind kind, Node *lhs) {
-  Node *node = create_node(kind);
+static Node *create_unary(NodeKind kind, Node *lhs, Token *token) {
+  Node *node = create_node(kind, token);
   node->lhs = lhs;
   return node;
 }
 
-static Node *create_num(int val) {
-  Node *node = create_node(NK_NUM);
+static Node *create_num(int val, Token *token) {
+  Node *node = create_node(NK_NUM, token);
   node->val = val;
   return node;
 }
 
-static Node *create_var(Obj *var) {
-  Node *node = create_node(NK_VAR);
+static Node *create_var(Obj *var, Token *token) {
+  Node *node = create_node(NK_VAR, token);
   node->var = var;
   return node;
 }
@@ -53,10 +54,11 @@ static void skip() {
   *chain = (*chain)->next;
 }
 
-static void consume(char *s) {
+static Token *consume(char *s) {
   Token *head = *chain;
   if (!equal(head, s)) error_at(head->loc, "expected '%s'", s);
   skip();
+  return head;
 }
 
 static Node *program();
@@ -131,8 +133,8 @@ static Node *stmt() {
 
 // IfStmt -> 'if' '(' Expr ')' Stmt ('else' Stmt)?
 static Node *if_stmt() {
-  Node *node = create_node(NK_IF_STMT);
-  consume("if");
+  Token *if_token = consume("if");
+  Node *node = create_node(NK_IF_STMT, if_token);
   consume("(");
   node->cond = expr();
   consume(")");
@@ -148,8 +150,8 @@ static Node *if_stmt() {
 
 // WhileStmt -> 'while' '(' Expr ')' Stmt
 static Node *while_stmt() {
-  Node *node = create_node(NK_WHILE_STMT);
-  consume("while");
+  Token *while_token = consume("while");
+  Node *node = create_node(NK_WHILE_STMT, while_token);
   consume("(");
   node->cond = expr();
   consume(")");
@@ -162,7 +164,7 @@ static Node *for_stmt() {
   Node *init_node = NULL;
   Node *cond_node = NULL;
   Node *update_node = NULL;
-  consume("for");
+  Token *for_token = consume("for");
   consume("(");
   if (!equal((*chain), ";")) init_node = expr();
   consume(";");
@@ -172,7 +174,7 @@ static Node *for_stmt() {
   consume(")");
   Node *body_node = stmt();
 
-  Node *for_node = create_node(NK_FOR_STMT);
+  Node *for_node = create_node(NK_FOR_STMT, for_token);
   for_node->lhs = init_node;
   for_node->cond = cond_node;
   for_node->rhs = update_node;
@@ -183,7 +185,7 @@ static Node *for_stmt() {
 
 // CompoundStmt -> '{' Stmt* '}'
 static Node *compound_stmt() {
-  consume("{");
+  Token *lbrace_token = consume("{");
   Node temp = {};
   Node *curr = &temp;
   while (can_start_stmt()) {
@@ -191,7 +193,7 @@ static Node *compound_stmt() {
     curr->next = stmt_node;
     curr = stmt_node;
   }
-  Node *node = create_node(NK_COMPOUND_STMT);
+  Node *node = create_node(NK_COMPOUND_STMT, lbrace_token);
   node->body = temp.next;
   consume("}");
   return node;
@@ -199,22 +201,22 @@ static Node *compound_stmt() {
 
 // NullStmt -> ';'
 static Node *null_stmt() {
-  consume(";");
-  Node *node = create_node(NK_NULL_STMT);
+  Token *semicolon_token = consume(";");
+  Node *node = create_node(NK_NULL_STMT, semicolon_token);
   return node;
 }
 
 // ReturnStmt -> 'return' Expr ';'
 static Node *return_stmt() {
-  consume("return");
-  Node *node = create_unary(NK_RETURN_STMT, expr());
+  Token *return_token = consume("return");
+  Node *node = create_unary(NK_RETURN_STMT, expr(), return_token);
   consume(";");
   return node;
 }
 
 // ExprStmt -> Expr ';'
 static Node *expr_stmt() {
-  Node *node = create_unary(NK_EXPR_STMT, expr());
+  Node *node = create_unary(NK_EXPR_STMT, expr(), *chain);
   consume(";");
   return node;
 }
@@ -242,12 +244,12 @@ static Node *assign() {
   char *name = strndup(head->loc, head->len);
   Obj *var = find_var(name);
   if (var == NULL) var = register_local(name);
-  Node *node_a = create_var(var);
+  Node *node_a = create_var(var, head);
   skip();
-  consume("=");
+  Token *equal_token = consume("=");
   Node *node_b = expr();
 
-  return create_binary(NK_ASSIGN, node_a, node_b);
+  return create_binary(NK_ASSIGN, node_a, node_b, equal_token);
 }
 
 // Equality -> Relational Equality'
@@ -268,7 +270,7 @@ static Node *equality_prime(Node *lhs) {
   NodeKind kind = equal(head, "==") ? NK_EQ : NK_NE;
   skip();
 
-  Node *node_a = create_binary(kind, lhs, relational());
+  Node *node_a = create_binary(kind, lhs, relational(), head);
   Node *node_b = equality_prime(node_a);
 
   if (node_b == NULL) return node_a;
@@ -297,7 +299,7 @@ static Node *relational_prime(Node *lhs) {
 
   skip();
 
-  Node *node_a = create_binary(kind, lhs, sum());
+  Node *node_a = create_binary(kind, lhs, sum(), head);
   Node *node_b = relational_prime(node_a);
 
   if (node_b == NULL) return node_a;
@@ -322,7 +324,7 @@ static Node *sum_prime(Node* lhs) {
   NodeKind kind = equal(head, "+") ? NK_ADD : NK_SUB;
   skip();
 
-  Node *node_a = create_binary(kind, lhs, term());
+  Node *node_a = create_binary(kind, lhs, term(), head);
   Node *node_b = sum_prime(node_a);
 
   if (node_b == NULL) return node_a;
@@ -347,7 +349,7 @@ static Node *term_prime(Node *lhs) {
   NodeKind kind = equal(head, "*") ? NK_MUL : NK_DIV;
   skip();
 
-  Node *node_a = create_binary(kind, lhs, unary());
+  Node *node_a = create_binary(kind, lhs, unary(), head);
   Node *node_b = term_prime(node_a);
 
   if (node_b == NULL) return node_a;
@@ -365,7 +367,7 @@ static Node *unary() {
 
   if (equal(head, "-")) {
     skip();
-    return create_unary(NK_NEG, unary());
+    return create_unary(NK_NEG, unary(), head);
   }
 
   return factor();
@@ -378,7 +380,7 @@ static Node *factor() {
   if (head->kind == TK_NUM) {
     int val = head->val;
     skip();
-    return create_num(val);
+    return create_num(val, head);
   }
 
   if (head->kind == TK_IDENT) {
@@ -387,7 +389,7 @@ static Node *factor() {
     // here we have some additional logic in the parsing step
     // probably will be extracted out to the preprocessing step later on
     if (var == NULL) error_at(head->loc, "Accessing variable not yet declared");
-    Node *node = create_var(var);
+    Node *node = create_var(var, head);
     skip();
     return node;
   }
