@@ -1,6 +1,8 @@
 #include "quackcc.h"
 
+// input tokens are represented by a linked list.
 static Token **chain;
+
 static Obj *locals;
 
 static Node *create_node(NodeKind kind, Token *token) {
@@ -98,7 +100,8 @@ static bool can_start_stmt() {
     // can start compound and null stmt
     if (equal(head, "{") || equal(head, ";")) return true;
     // can start expr stmt
-    if (equal(head, "(") || equal(head, "+") || equal(head, "-")) return true;
+    if (equal(head, "(") || equal(head, "+") || equal(head, "-") ||
+        equal(head, "*") || equal(head, "&")) return true;
   }
 
   return false;
@@ -221,34 +224,18 @@ static Node *expr_stmt() {
   return node;
 }
 
-// Expr -> Equality | Assign
+// Expr -> Assign
 static Node *expr() {
-  Token *head = *chain;
-  Token *lookahead = head->next;
-
-  if (head->kind == TK_IDENT && lookahead->kind == TK_PUNC &&
-      equal(lookahead, "=")) {
-    return assign();
-  }
-
-  return equality();
+  return assign();
 }
 
-// Assign -> Ident '=' Expr
+// Assign -> Equality ('=' Assign)?
 static Node *assign() {
+  Node *node_a = equality();
   Token *head = *chain;
-
-  if (head->kind != TK_IDENT)
-    error_at(head->loc, "expected identifier as left-hand side of assignment");
-
-  char *name = strndup(head->loc, head->len);
-  Obj *var = find_var(name);
-  if (var == NULL) var = register_local(name);
-  Node *node_a = create_var(var, head);
-  skip();
+  if (!equal(head, "=")) return node_a;
   Token *equal_token = consume("=");
-  Node *node_b = expr();
-
+  Node *node_b = assign();
   return create_binary(NK_ASSIGN, node_a, node_b, equal_token);
 }
 
@@ -356,7 +343,7 @@ static Node *term_prime(Node *lhs) {
   return node_b;
 }
 
-// Unary -> '+' Unary | '-' Unary | Factor
+// Unary -> '+' Unary | '-' Unary | '*' Unary | '&' Unary | Factor
 static Node *unary() {
   Token *head = *chain;
 
@@ -368,6 +355,16 @@ static Node *unary() {
   if (equal(head, "-")) {
     skip();
     return create_unary(NK_NEG, unary(), head);
+  }
+
+  if (equal(head, "&")) {
+    skip();
+    return create_unary(NK_ADDR, unary(), head);
+  }
+
+  if (equal(head, "*")) {
+    skip();
+    return create_unary(NK_DEREF, unary(), head);
   }
 
   return factor();
@@ -386,9 +383,7 @@ static Node *factor() {
   if (head->kind == TK_IDENT) {
     char *name = strndup(head->loc, head->len);
     Obj *var = find_var(name);
-    // here we have some additional logic in the parsing step
-    // probably will be extracted out to the preprocessing step later on
-    if (var == NULL) error_at(head->loc, "Accessing variable not yet declared");
+    if (var == NULL) var = register_local(name);
     Node *node = create_var(var, head);
     skip();
     return node;

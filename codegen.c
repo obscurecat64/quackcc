@@ -2,6 +2,8 @@
 
 static int depth;
 
+static void gen_expr(Node *node);
+
 static char *gen_label_name() {
   static int i = 1;
   char *label = malloc(16);
@@ -20,35 +22,47 @@ static void pop(char* reg) {
 }
 
 static void gen_addr(Node *node) {
-  if (node->kind != NK_VAR) error_at(node->token->loc, "not an lvalue");
-  printf("    add x0, fp, #%d\n", node->var->offset);
+  switch (node->kind) {
+  case NK_VAR:
+    printf("    add x0, fp, #%d\n", node->var->offset);
+    return;
+  case NK_DEREF:
+    gen_expr(node->lhs);
+    return;
+  default:
+    error_at(node->token->loc, "not an lvalue");
+  }
 }
 
 static void gen_expr(Node *node) {
-  if (node->kind == NK_NUM) {
+  switch(node->kind) {
+  case NK_NUM:
     printf("    mov x0, #%d\n", node->val);
     return;
-  }
-
-  if (node->kind == NK_NEG) {
+  case NK_NEG:
     gen_expr(node->lhs);
     printf("    neg x0, x0\n");
     return;
-  }
-
-  if (node->kind == NK_VAR) {
+  case NK_VAR:
     gen_addr(node);
     printf("    ldr x0, [x0]\n");
     return;
-  }
-
-  if (node->kind == NK_ASSIGN) {
+  case NK_ASSIGN:
     gen_expr(node->rhs);
     push("x0");
     gen_addr(node->lhs);
     pop("x1");
     printf("    str x1, [x0]\n");
     return;
+  case NK_DEREF:
+    gen_expr(node->lhs);
+    printf("    ldr x0, [x0]\n");
+    return;
+  case NK_ADDR:
+    gen_addr(node->lhs);
+    return;
+  default:
+    break;
   }
 
   // evaluate rhs, then push the value in x0 on stack

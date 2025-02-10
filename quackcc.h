@@ -63,6 +63,8 @@ typedef enum {
   NK_IF_STMT,
   NK_WHILE_STMT,
   NK_FOR_STMT,
+  NK_ADDR,
+  NK_DEREF,
 } NodeKind;
 
 typedef struct Obj Obj;
