@@ -31,6 +31,68 @@ static Node *create_num(int val, Token *token) {
   return node;
 }
 
+// In C, `+` operator is overloaded to perform the pointer arithmetic.
+// If p is a pointer, p+n adds not n but sizeof(*p)*n to the value of p,
+// so that p+n points to the location n elements (not bytes) ahead of p.
+// In other words, we need to scale an integer value before adding to a
+// pointer value. This function takes care of the scaling.
+static Node *create_add(Node *lhs, Node *rhs, Token *token) {
+  add_type(lhs);
+  add_type(rhs);
+
+  bool is_lhs_integer = is_integer(lhs->type);
+  bool is_rhs_integer = is_integer(rhs->type);
+
+  // ptr + ptr
+  if (!is_lhs_integer && !is_rhs_integer)
+    error_at(token->loc, "invalid operands");
+
+  // num + num
+  if (is_lhs_integer && is_rhs_integer)
+    return create_binary(NK_ADD, lhs, rhs, token);
+
+  // num + ptr
+  // canonicalize `num + ptr` to `ptr + num`
+  if (is_lhs_integer && !is_rhs_integer) {
+    Node *temp = lhs;
+    lhs = temp;
+    rhs = lhs;
+  }
+
+  // ptr + num
+  rhs = create_binary(NK_MUL, rhs, create_num(8, token), token);
+  return create_binary(NK_ADD, lhs, rhs, token);
+};
+
+// Like `+`, `-` is overloaded for the pointer type.
+static Node *create_sub(Node *lhs, Node *rhs, Token *token) {
+  add_type(lhs);
+  add_type(rhs);
+
+  bool is_lhs_integer = is_integer(lhs->type);
+  bool is_rhs_integer = is_integer(rhs->type);
+
+  // num - ptr
+  if (is_lhs_integer && !is_rhs_integer)
+    error_at(token->loc, "invalid operands");
+
+  // num - num
+  if (is_lhs_integer && is_rhs_integer)
+    return create_binary(NK_SUB, lhs, rhs, token);
+
+  // ptr - num
+  if (is_rhs_integer) {
+    rhs = create_binary(NK_MUL, rhs, create_num(8, token), token);
+    return create_binary(NK_SUB, lhs, rhs, token);
+  }
+
+  // ptr - ptr
+  // return how many elements are between the two
+  Node *node = create_binary(NK_SUB, lhs, rhs, token);
+  node->type = type_int;
+  return create_binary(NK_DIV, node, create_num(8, token), token);
+};
+
 static Node *create_var(Obj *var, Token *token) {
   Node *node = create_node(NK_VAR, token);
   node->var = var;
@@ -195,6 +257,7 @@ static Node *compound_stmt() {
     Node *stmt_node = stmt();
     curr->next = stmt_node;
     curr = stmt_node;
+    add_type(curr);
   }
   Node *node = create_node(NK_COMPOUND_STMT, lbrace_token);
   node->body = temp.next;
@@ -308,10 +371,11 @@ static Node *sum_prime(Node* lhs) {
 
   if (!equal(head, "+") && !equal(head, "-")) return NULL;
 
-  NodeKind kind = equal(head, "+") ? NK_ADD : NK_SUB;
+  Node *node_a = NULL;
   skip();
+  if (equal(head, "+")) node_a = create_add(lhs, term(), head);
+  else node_a = create_sub(lhs, term(), head);
 
-  Node *node_a = create_binary(kind, lhs, term(), head);
   Node *node_b = sum_prime(node_a);
 
   if (node_b == NULL) return node_a;

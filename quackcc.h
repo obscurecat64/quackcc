@@ -6,6 +6,9 @@
 #include <string.h>
 #include <ctype.h>
 
+typedef struct Type Type;
+typedef struct Node Node;
+
 //
 // main.c
 //
@@ -74,7 +77,6 @@ struct Obj {
   int offset;
 };
 
-typedef struct Node Node;
 struct Node {
   NodeKind kind;
   Node *lhs;
@@ -85,6 +87,7 @@ struct Node {
   Node *body;
   Node *cond;
   Token *token;
+  Type *type;
 };
 
 typedef struct Fun Fun;
@@ -97,7 +100,26 @@ struct Fun {
 Fun *parse(Token *head);
 
 //
-// parse.c
+// type.c
+//
+
+typedef enum {
+  TYK_INT,
+  TYK_PTR,
+} TypeKind;
+
+struct Type {
+  TypeKind kind;
+  Type *base;
+};
+
+extern Type *type_int;
+
+bool is_integer(Type *type);
+void add_type(Node *node);
+
+//
+// codegen.c
 //
 
 void codegen(Fun *prog);
