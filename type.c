@@ -36,16 +36,19 @@ void add_type(Node *node) {
   case NK_LE:
   case NK_GT:
   case NK_GE:
-  case NK_VAR:
   case NK_NUM:
     node->type = type_int;
+    return;
+  case NK_VAR:
+    node->type = node->var->type;
     return;
   case NK_ADDR:
     node->type = create_pointer_to(node->lhs->type);
     return;
   case NK_DEREF:
-    if (node->lhs->type->kind == TYK_PTR) node->type = node->lhs->type->base;
-    else node->type = type_int;
+    if (node->lhs->type->kind != TYK_PTR)
+      error_at(node->token->loc, "invalid pointer dereference");
+    else node->type = node->lhs->type->base;
     return;
   default:
     return;

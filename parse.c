@@ -5,6 +5,12 @@ static Token **chain;
 
 static Obj *locals;
 
+static char *get_ident(Token *token) {
+  if (token->kind != TK_IDENT)
+    error_at(token->loc, "expected an identifier");
+  return strndup(token->loc, token->len);
+}
+
 static Node *create_node(NodeKind kind, Token *token) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
@@ -99,9 +105,10 @@ static Node *create_var(Obj *var, Token *token) {
   return node;
 }
 
-static Obj *register_local(char *name) {
+static Obj *register_local(char *name, Type *type) {
   Obj *obj = calloc(1, sizeof(Obj));
   obj->name = name;
+  obj->type = type;
   obj->next = locals;
   locals = obj;
   return obj;
@@ -125,27 +132,31 @@ static Token *consume(char *s) {
   return head;
 }
 
-static Node *program();
-static Node *stmt();
-static Node *if_stmt();
-static Node *while_stmt();
-static Node *for_stmt();
-static Node *compound_stmt();
-static Node *null_stmt();
-static Node *return_stmt();
-static Node *expr_stmt();
-static Node *expr();
-static Node *assign();
-static Node *equality();
+static Node *program(void);
+static Node *stmt(void);
+static Node *declaration(void);
+static Node *declaration_prime(Type *base);
+static Type *declarator(Type *type);
+static Type *decl_spec(void);
+static Node *if_stmt(void);
+static Node *while_stmt(void);
+static Node *for_stmt(void);
+static Node *compound_stmt(void);
+static Node *null_stmt(void);
+static Node *return_stmt(void);
+static Node *expr_stmt(void);
+static Node *expr(void);
+static Node *assign(void);
+static Node *equality(void);
 static Node *equality_prime(Node *lhs);
-static Node *relational();
+static Node *relational(void);
 static Node *relational_prime(Node *lhs);
-static Node *sum();
+static Node *sum(void);
 static Node *sum_prime(Node *lhs);
-static Node *term();
+static Node *term(void);
 static Node *term_prime(Node *lhs);
-static Node *unary();
-static Node *factor();
+static Node *unary(void);
+static Node *factor(void);
 
 static bool can_start_stmt() {
   Token *head = *chain;
@@ -194,6 +205,67 @@ static Node *stmt() {
     if (equal(head, ";")) return null_stmt();
   }
   return expr_stmt();
+}
+
+// Declaration -> DeclSpec (Declaration' ("," Declaration')*)? ";"
+static Node *declaration() {
+  Token *start_token = *chain;
+  Type *base = decl_spec();
+
+  if (equal(*chain, ";")) return create_node(NK_COMPOUND_STMT, start_token);
+
+  Node temp = {};
+  Node *curr = &temp;
+
+  int i = 0;
+  while (!equal(*chain, ";")) {
+    if (i++ > 0) consume(",");
+    Node *result = declaration_prime(base);
+    if (result == NULL) continue;
+    curr->next = create_unary(NK_EXPR_STMT, result, start_token);
+    curr = curr->next;
+  }
+
+  skip();
+  Node *node = create_node(NK_COMPOUND_STMT, start_token);
+  node->body = temp.next;
+
+  return node;
+}
+
+// Declaration' -> Declarator ("=" Expr)?
+static Node *declaration_prime(Type *base) {
+  Type *type = declarator(base);
+  Obj *var = register_local(get_ident(type->ident), type);
+  Node *node_a = create_var(var, type->ident);
+
+  if (!equal(*chain, "="))
+    return NULL;
+
+  Token *equal_token = consume("=");
+  Node *node_b = expr();
+  return create_binary(NK_ASSIGN, node_a, node_b, equal_token);
+}
+
+// Declarator -> "*"* Ident
+static Type *declarator(Type *type) {
+  while (equal(*chain, "*")) {
+    type = create_pointer_to(type);
+    skip();
+  }
+
+  Token *head = *chain;
+  if (head->kind != TK_IDENT) error_at(head->loc, "expected a variable name");
+
+  type->ident = head;
+  skip();
+  return type;
+}
+
+// DeclSpec -> "int"
+static Type *decl_spec() {
+  consume("int");
+  return type_int;
 }
 
 // IfStmt -> 'if' '(' Expr ')' Stmt ('else' Stmt)?
@@ -248,16 +320,21 @@ static Node *for_stmt() {
   return for_node;
 }
 
-// CompoundStmt -> '{' Stmt* '}'
+// CompoundStmt -> '{' (Stmt | Declaration)* '}'
 static Node *compound_stmt() {
   Token *lbrace_token = consume("{");
   Node temp = {};
   Node *curr = &temp;
-  while (can_start_stmt()) {
-    Node *stmt_node = stmt();
-    curr->next = stmt_node;
-    curr = stmt_node;
-    add_type(curr);
+  while (!equal(*chain, "}")) {
+    if (can_start_stmt()) {
+      Node *stmt_node = stmt();
+      curr->next = stmt_node;
+      curr = curr->next;
+      add_type(curr);
+    } else {
+      curr->next = declaration();
+      curr = curr->next;
+    }
   }
   Node *node = create_node(NK_COMPOUND_STMT, lbrace_token);
   node->body = temp.next;
@@ -447,7 +524,7 @@ static Node *factor() {
   if (head->kind == TK_IDENT) {
     char *name = strndup(head->loc, head->len);
     Obj *var = find_var(name);
-    if (var == NULL) var = register_local(name);
+    if (var == NULL) error_at(head->loc, "undefined variable");
     Node *node = create_var(var, head);
     skip();
     return node;

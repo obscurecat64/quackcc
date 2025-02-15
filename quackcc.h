@@ -73,6 +73,7 @@ typedef enum {
 typedef struct Obj Obj;
 struct Obj {
   Obj *next;
+  Type *type;
   char *name;
   int offset;
 };
@@ -111,12 +112,14 @@ typedef enum {
 struct Type {
   TypeKind kind;
   Type *base;
+  Token *ident;
 };
 
 extern Type *type_int;
 
 bool is_integer(Type *type);
 void add_type(Node *node);
+Type *create_pointer_to(Type *base);
 
 //
 // codegen.c

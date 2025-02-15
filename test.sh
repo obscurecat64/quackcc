@@ -52,11 +52,11 @@ assert 1 '{ 0 == 1 != 1; }'
 assert 1 '{ 3;2;1; }'
 assert 3 '{ 1;2;3; }'
 
-assert 3 '{ a=3; a; }'
-assert 0 '{ x=y=10; x-y==0; }'
-assert 1 '{ x=5; x == 5; }'
-assert 7 '{ my_num = 7; my_num; }'
-assert 8 '{ foo123=3; bar=5; foo123+bar; }'
+assert 3 '{ int a=3; a; }'
+assert 0 '{ int x, y; x=y=10; x-y==0; }'
+assert 1 '{ int x=5; x == 5; }'
+assert 7 '{ int my_num = 7; my_num; }'
+assert 8 '{ int foo123=3; int bar=5; foo123+bar; }'
 
 assert 1 '{ return 1; }';
 assert 4 '{ return 2 + 2; }';
@@ -76,24 +76,27 @@ assert 4 '{ if (0) { 1; 2; return 3; } else { return 4; } }'
 assert 3 '{ if (1) { 1; 2; return 3; } else { return 4; } }'
 assert 5 '{ if (1) ; 5; }'
 
-assert 5 '{ for (i = 1; i < 5; i = i + 1); return i; }'
-assert 8 '{ i = 2; j = 0; for (; i < 10; i = i + 1) j = j + 1; return j; }'
-assert 55 '{ i=0; j=0; for (i=0; i<=10; i=i+1) j=i+j; return j; }'
+assert 5 '{int i; for (i = 1; i < 5; i = i + 1); return i; }'
+assert 8 '{ int i = 2, j = 0; for (; i < 10; i = i + 1) j = j + 1; return j; }'
+assert 55 '{ int i=0, j=0; for (i=0; i<=10; i=i+1) j=i+j; return j; }'
 assert 3 '{ for (;;) {return 3;} return 5; }'
 
-assert 0 '{ i = 3; while (i) { i = i - 1; } return i; }'
-assert 10 '{ i=0; while(i<10) { i=i+1; } return i; }'
+assert 0 '{ int i = 3; while (i) { i = i - 1; } return i; }'
+assert 10 '{ int i=0; while(i<10) { i=i+1; } return i; }'
 
-assert 3 '{ x=3; return *&x; }'
-assert 3 '{ x=3; y=&x; z=&y; return **z; }'
+assert 3 '{ int x=3; return *&x; }'
+assert 3 '{ int x=3; int *y=&x; int **z=&y; return **z; }'
 
-assert 5 '{ x=3; y=5; return *(&x+1); }'
-assert 3 '{ x=3; y=5; return *(&y-1); }'
-assert 5 '{ x=3; y=5; return *(&x-(-1)); }'
-assert 5 '{ x=3; y=&x; *y=5; return x; }'
-assert 7 '{ x=3; y=5; *(&x+1)=7; return y; }'
-assert 7 '{ x=3; y=5; *(&y-2+1)=7; return x; }'
-assert 5 '{ x=3; return (&x+2)-&x+3; }'
+assert 5 '{ int x=3, y=5; return *(&x+1); }'
+assert 3 '{ int x=3, y=5; return *(&y-1); }'
+assert 5 '{ int x=3, y=5; return *(&x-(-1)); }'
+assert 5 '{ int x=3, *y=&x; *y=5; return x; }'
+assert 7 '{ int x=3, y=5; *(&x+1)=7; return y; }'
+assert 7 '{ int x=3, y=5; *(&y-2+1)=7; return x; }'
+assert 5 '{ int x=3; return (&x+2)-&x+3; }'
 
+assert 8 '{ int x, y; x=3; y=5; return x+y; }'
+assert 8 '{ int x=3, y=5; return x+y; }'
+assert 0 '{int; return 0;}'
 
 echo OK
