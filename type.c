@@ -37,6 +37,7 @@ void add_type(Node *node) {
   case NK_GT:
   case NK_GE:
   case NK_NUM:
+  case NK_FUNC_CALL:
     node->type = type_int;
     return;
   case NK_VAR:

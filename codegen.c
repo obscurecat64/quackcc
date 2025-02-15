@@ -61,6 +61,9 @@ static void gen_expr(Node *node) {
   case NK_ADDR:
     gen_addr(node->lhs);
     return;
+  case NK_FUNC_CALL:
+    printf("    bl _%s\n", node->func_name);
+    return;
   default:
     break;
   }
@@ -214,7 +217,7 @@ void codegen(Fun *prog) {
   printf("_main:\n");
   
   // prologue
-  printf("    str fp, [sp, #-16]!\n");
+  printf("    stp fp, lr, [sp, #-16]!\n");
   printf("    mov fp, sp\n");
   printf("    sub sp, sp, #%d\n", prog->stack_size);
 
@@ -222,7 +225,7 @@ void codegen(Fun *prog) {
 
   // epilogue
   printf("return:\n");
-  printf("    add sp, fp, #16\n");
-  printf("    ldr fp, [fp]\n");
+  printf("    mov sp, fp\n");
+  printf("    ldp fp, lr, [sp], #16\n");
   printf("    ret\n");
 }

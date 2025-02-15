@@ -157,6 +157,7 @@ static Node *term(void);
 static Node *term_prime(Node *lhs);
 static Node *unary(void);
 static Node *factor(void);
+static void args(void);
 
 static bool can_start_stmt() {
   Token *head = *chain;
@@ -511,7 +512,7 @@ static Node *unary() {
   return factor();
 }
 
-// Factor -> Number | ( Expr ) | Ident
+// Factor -> Number | ( Expr ) | Ident (Args)?
 static Node *factor() {
   Token *head = *chain;
 
@@ -522,6 +523,17 @@ static Node *factor() {
   }
 
   if (head->kind == TK_IDENT) {
+    // function call
+    if (equal(head->next, "(")) {
+      Node *node = create_node(NK_FUNC_CALL, head->next);
+      char *func_name = strndup(head->loc, head->len);
+      node->func_name = func_name;
+      skip();
+      args();
+      return node;
+    }
+
+    // referencing a variable
     char *name = strndup(head->loc, head->len);
     Obj *var = find_var(name);
     if (var == NULL) error_at(head->loc, "undefined variable");
@@ -535,6 +547,11 @@ static Node *factor() {
   consume(")");
 
   return node;
+}
+
+static void args() {
+  consume("(");
+  consume(")");
 }
 
 Fun *parse(Token *head) {

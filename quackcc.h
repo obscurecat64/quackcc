@@ -68,6 +68,7 @@ typedef enum {
   NK_FOR_STMT,
   NK_ADDR,
   NK_DEREF,
+  NK_FUNC_CALL,
 } NodeKind;
 
 typedef struct Obj Obj;
@@ -89,6 +90,7 @@ struct Node {
   Node *cond;
   Token *token;
   Type *type;
+  char *func_name;
 };
 
 typedef struct Fun Fun;
