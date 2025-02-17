@@ -331,7 +331,6 @@ static Node *compound_stmt() {
       Node *stmt_node = stmt();
       curr->next = stmt_node;
       curr = curr->next;
-      add_type(curr);
     } else {
       curr->next = declaration();
       curr = curr->next;

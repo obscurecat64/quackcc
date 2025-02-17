@@ -18,8 +18,6 @@ void add_type(Node *node) {
   
   add_type(node->lhs);
   add_type(node->rhs);
-  add_type(node->cond);
-  for (Node *n = node->body; n; n = n->next) add_type(n);
   
   switch (node->kind) {
   case NK_ADD:
