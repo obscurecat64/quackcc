@@ -1,6 +1,7 @@
 #include "quackcc.h"
 
 static int depth;
+static char *argreg[] = {"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"};
 
 static void gen_expr(Node *node);
 
@@ -61,9 +62,22 @@ static void gen_expr(Node *node) {
   case NK_ADDR:
     gen_addr(node->lhs);
     return;
-  case NK_FUNC_CALL:
+  case NK_FUNC_CALL: {
+    int i = -1;
+    // push onto stack, so that we can free up x0 for gen_expr
+    for (Node *arg = node->args; arg; arg = arg->next) {
+      gen_expr(arg);
+      push("x0");
+      i++;
+    }
+    // now assign arguments into registers x0 - x7
+    for (; i >= 0; i--) {
+      pop(argreg[i]);
+    }
+    // call func
     printf("    bl _%s\n", node->func_name);
     return;
+  }
   default:
     break;
   }

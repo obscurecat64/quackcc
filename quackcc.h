@@ -91,6 +91,7 @@ struct Node {
   Token *token;
   Type *type;
   char *func_name;
+  Node *args;
 };
 
 typedef struct Fun Fun;

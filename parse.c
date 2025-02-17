@@ -157,7 +157,7 @@ static Node *term(void);
 static Node *term_prime(Node *lhs);
 static Node *unary(void);
 static Node *factor(void);
-static void args(void);
+static Node *args(void);
 
 static bool can_start_stmt() {
   Token *head = *chain;
@@ -528,7 +528,7 @@ static Node *factor() {
       char *func_name = strndup(head->loc, head->len);
       node->func_name = func_name;
       skip();
-      args();
+      node->args = args();
       return node;
     }
 
@@ -548,9 +548,30 @@ static Node *factor() {
   return node;
 }
 
-static void args() {
+
+// Args -> '(' ( Expr ( ',' Expr ) * )? ')'
+static Node *args() {
   consume("(");
+
+  // no arguments
+  if (equal(*chain, ")")) {
+    consume(")");
+    return NULL;
+  }
+
+  Node temp = {};
+  Node *curr = &temp;
+  int i = 0;
+
+  while (!equal((*chain), ")")) {
+    if (i++) consume(",");
+    curr->next = expr();
+    curr = curr->next;
+  }
+
   consume(")");
+
+  return temp.next;
 }
 
 Fun *parse(Token *head) {
