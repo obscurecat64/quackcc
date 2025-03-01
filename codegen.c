@@ -2,13 +2,20 @@
 
 static int depth;
 static char *argreg[] = {"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"};
+static Fun *current_function;
 
 static void gen_expr(Node *node);
 
-static char *gen_label_name() {
+static char *gen_simple_label_name() {
   static int i = 1;
   char *label = malloc(16);
-  snprintf(label, 16, ".L%d", i++);
+  snprintf(label, 16, ".L%d.%s", i++, current_function->name);
+  return label;
+}
+
+static char *gen_return_label_name() {
+  char *label = malloc(16);
+  snprintf(label, 16, ".L.return.%s", current_function->name);
   return label;
 }
 
@@ -144,7 +151,7 @@ static void gen_stmt(Node *node) {
       return;
     case NK_RETURN_STMT:
       gen_expr(node->lhs);
-      printf("    b return\n");
+      printf("b %s\n", gen_return_label_name());
       return;
     case NK_COMPOUND_STMT:
       for (Node *stmt = node->body; stmt; stmt = stmt->next) {
@@ -157,7 +164,7 @@ static void gen_stmt(Node *node) {
       return;
     case NK_IF_STMT: {
       if (node->rhs == NULL) {
-        char *l = gen_label_name();
+        char *l = gen_simple_label_name();
         gen_expr(node->cond);
         printf("    cmp x0, #0\n");
         printf("    beq %s\n", l);
@@ -166,8 +173,8 @@ static void gen_stmt(Node *node) {
         return;
       }
 
-      char *l1 = gen_label_name();
-      char *l2 = gen_label_name();
+      char *l1 = gen_simple_label_name();
+      char *l2 = gen_simple_label_name();
       gen_expr(node->cond);
       printf("    cmp x0, #0\n");
       printf("    beq %s\n", l1);
@@ -179,8 +186,8 @@ static void gen_stmt(Node *node) {
       return;
     }
     case NK_WHILE_STMT: {
-      char *l1 = gen_label_name();
-      char *l2 = gen_label_name();
+      char *l1 = gen_simple_label_name();
+      char *l2 = gen_simple_label_name();
       printf("%s:\n", l1);
       gen_expr(node->cond);
       printf("    cmp x0, #0\n");
@@ -191,8 +198,8 @@ static void gen_stmt(Node *node) {
       return;
     }
     case NK_FOR_STMT: {
-      char *l1 = gen_label_name();
-      char *l2 = gen_label_name();
+      char *l1 = gen_simple_label_name();
+      char *l2 = gen_simple_label_name();
       if (node->lhs != NULL) gen_expr(node->lhs);
       printf("%s:\n", l1);
       if (node->cond != NULL) {
@@ -224,22 +231,28 @@ static void assign_lvar_offsets(Fun *fun) {
   fun->stack_size = align_to(offset, 16);
 }
 
-void codegen(Fun *prog) {
-  assign_lvar_offsets(prog);
+static void gen_func(Fun *fun) {
+  assign_lvar_offsets(fun);
 
-  printf(".global _main\n\n");
-  printf("_main:\n");
-  
+  current_function = fun;
+
+  printf(".global _%s\n\n", fun->name);
+  printf("_%s:\n", fun->name);
+
   // prologue
   printf("    stp fp, lr, [sp, #-16]!\n");
   printf("    mov fp, sp\n");
-  printf("    sub sp, sp, #%d\n", prog->stack_size);
+  printf("    sub sp, sp, #%d\n", fun->stack_size);
 
-  gen_stmt(prog->body);
+  gen_stmt(fun->body);
 
   // epilogue
-  printf("return:\n");
+  printf("%s:\n", gen_return_label_name());
   printf("    mov sp, fp\n");
   printf("    ldp fp, lr, [sp], #16\n");
-  printf("    ret\n");
+  printf("    ret\n\n");
+}
+
+void codegen(Fun *prog) {
+  for (Fun *fun = prog; fun; fun = fun->next) gen_func(fun);
 }

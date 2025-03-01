@@ -105,7 +105,7 @@ static Node *create_var(Obj *var, Token *token) {
   return node;
 }
 
-static Obj *register_local(char *name, Type *type) {
+static Obj *create_local(char *name, Type *type) {
   Obj *obj = calloc(1, sizeof(Obj));
   obj->name = name;
   obj->type = type;
@@ -132,11 +132,14 @@ static Token *consume(char *s) {
   return head;
 }
 
-static Node *program(void);
+static Fun *program(void);
+static Fun *function_def(void);
 static Node *stmt(void);
 static Node *declaration(void);
 static Node *declaration_prime(Type *base);
 static Type *declarator(Type *type);
+static Type *declarator_prefix(Type *type);
+static Type *declarator_suffix(Type *type);
 static Type *decl_spec(void);
 static Node *if_stmt(void);
 static Node *while_stmt(void);
@@ -181,14 +184,17 @@ static bool can_start_stmt() {
   return false;
 }
 
-// Program -> CompoundStmt EOF
-static Node *program() {
-  Node *node = compound_stmt();
-  if ((*chain)->kind != TK_EOF) {
-    char *token_str = strndup((*chain)->loc, (*chain)->len);
-    error_at((*chain)->loc, "unexpected '%s'", token_str);
+// Program -> FunctionDefinition* EOF
+static Fun *program() {
+  Fun temp = {};
+  Fun *curr = &temp;
+
+  while ((*chain)->kind != TK_EOF) {
+    curr->next = function_def();
+    curr = curr->next;
   }
-  return node;
+
+  return temp.next;
 }
 
 // Stmt -> ExprStmt | CompoundStmt | NullStmt | ReturnStmt | IfStmt | ForStmt
@@ -237,7 +243,7 @@ static Node *declaration() {
 // Declaration' -> Declarator ("=" Expr)?
 static Node *declaration_prime(Type *base) {
   Type *type = declarator(base);
-  Obj *var = register_local(get_ident(type->ident), type);
+  Obj *var = create_local(get_ident(type->ident), type);
   Node *node_a = create_var(var, type->ident);
 
   if (!equal(*chain, "="))
@@ -248,8 +254,16 @@ static Node *declaration_prime(Type *base) {
   return create_binary(NK_ASSIGN, node_a, node_b, equal_token);
 }
 
-// Declarator -> "*"* Ident
+// Declarator -> DeclaratorPrefix DeclaratorSuffix?
 static Type *declarator(Type *type) {
+  type = declarator_prefix(type);
+
+  if (!equal((*chain), "(")) return type;
+  return declarator_suffix(type);
+}
+
+// DeclaratorPrefix ->  "*"* Ident
+static Type *declarator_prefix(Type *type) {
   while (equal(*chain, "*")) {
     type = create_pointer_to(type);
     skip();
@@ -260,6 +274,21 @@ static Type *declarator(Type *type) {
 
   type->ident = head;
   skip();
+
+  return type;
+}
+
+// DeclaratorSuffix -> "(" FunParams ")"
+static Type *declarator_suffix(Type *type) {
+  Token *ident = type->ident;
+
+  consume("(");
+  // TODO: void?
+  consume(")");
+
+  type = create_function_type(type);
+  type->ident = ident;
+
   return type;
 }
 
@@ -574,11 +603,25 @@ static Node *args() {
   return temp.next;
 }
 
+// FunctionDefinition ->
+// DeclSpec DeclaratorPrefix DeclaratorSuffix CompoundStatement
+Fun *function_def() {
+  Type *type = decl_spec();
+  type = declarator_prefix(type);
+  type = declarator_suffix(type);
+
+  // reset locals
+  locals = NULL;
+
+  Fun *fun = calloc(1, sizeof(Fun));
+  fun->name = get_ident(type->ident);
+  fun->body = compound_stmt();
+  fun->locals = locals;
+
+  return fun;
+}
+
 Fun *parse(Token *head) {
   chain = &head;
-  Node *body = program();
-  Fun *fun = calloc(1, sizeof(Fun));
-  fun->body = body;
-  fun->locals = locals;
-  return fun;
+  return program();
 }

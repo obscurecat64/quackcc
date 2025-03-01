@@ -96,6 +96,8 @@ struct Node {
 
 typedef struct Fun Fun;
 struct Fun {
+  Fun *next;
+  char *name;
   Node *body;
   Obj *locals;
   int stack_size;
@@ -110,12 +112,14 @@ Fun *parse(Token *head);
 typedef enum {
   TYK_INT,
   TYK_PTR,
+  TYK_FUN,
 } TypeKind;
 
 struct Type {
   TypeKind kind;
   Type *base;
   Token *ident;
+  Type *return_type;
 };
 
 extern Type *type_int;
@@ -123,6 +127,7 @@ extern Type *type_int;
 bool is_integer(Type *type);
 void add_type(Node *node);
 Type *create_pointer_to(Type *base);
+Type *create_function_type(Type *return_type);
 
 //
 // codegen.c

@@ -13,6 +13,13 @@ Type *create_pointer_to(Type *base) {
   return type;
 }
 
+Type *create_function_type(Type *return_type) {
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TYK_FUN;
+  type->return_type = return_type;
+  return type;
+}
+
 void add_type(Node *node) {
   if (!node || node->type) return;
   
