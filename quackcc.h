@@ -99,6 +99,7 @@ struct Fun {
   Fun *next;
   char *name;
   Node *body;
+  Obj *params;
   Obj *locals;
   int stack_size;
 };
@@ -117,9 +118,17 @@ typedef enum {
 
 struct Type {
   TypeKind kind;
+
+  // pointer
   Type *base;
+
+  // declaration
   Token *ident;
+
+  // function type
   Type *return_type;
+  Type *param_types;
+  Type *next_param_type;
 };
 
 extern Type *type_int;
@@ -128,6 +137,7 @@ bool is_integer(Type *type);
 void add_type(Node *node);
 Type *create_pointer_to(Type *base);
 Type *create_function_type(Type *return_type);
+Type *copy_type(Type *original);
 
 //
 // codegen.c

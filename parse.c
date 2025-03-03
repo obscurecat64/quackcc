@@ -114,6 +114,12 @@ static Obj *create_local(char *name, Type *type) {
   return obj;
 }
 
+static void create_param_locals(Type *param_type) {
+  if (!param_type) return;
+  create_param_locals(param_type->next_param_type);
+  create_local(get_ident(param_type->ident), param_type);
+}
+
 static Obj *find_var(char *name) {
   for (Obj *var = locals; var; var = var->next) {
     if (strcmp(var->name, name) == 0) return var;
@@ -272,22 +278,46 @@ static Type *declarator_prefix(Type *type) {
   Token *head = *chain;
   if (head->kind != TK_IDENT) error_at(head->loc, "expected a variable name");
 
+  if (type == type_int) type = copy_type(type);
   type->ident = head;
   skip();
 
   return type;
 }
 
-// DeclaratorSuffix -> "(" FunParams ")"
+// DeclaratorSuffix ->
+// "(" ((DeclSpec DeclaratorPrefix) ("," DeclSpec DeclaratorPrefix)* )? ")"
 static Type *declarator_suffix(Type *type) {
   Token *ident = type->ident;
 
   consume("(");
-  // TODO: void?
+
+  // no parameters
+  if (equal(*chain, ")")) {
+    // TODO: void?
+    consume(")");
+    type = create_function_type(type);
+    type->ident = ident;
+    return type;
+  }
+
+  Type temp = {};
+  Type *curr = &temp;
+  int i = 0;
+
+  while (!equal(*chain, ")")) {
+    if (i++) consume(",");
+    Type *type = decl_spec();
+    type = declarator_prefix(type);
+    curr->next_param_type = type;
+    curr = curr->next_param_type;
+  }
+
   consume(")");
 
   type = create_function_type(type);
   type->ident = ident;
+  type->param_types = temp.next_param_type;
 
   return type;
 }
@@ -364,6 +394,7 @@ static Node *compound_stmt() {
       curr->next = declaration();
       curr = curr->next;
     }
+    add_type(curr);
   }
   Node *node = create_node(NK_COMPOUND_STMT, lbrace_token);
   node->body = temp.next;
@@ -615,6 +646,10 @@ Fun *function_def() {
 
   Fun *fun = calloc(1, sizeof(Fun));
   fun->name = get_ident(type->ident);
+
+  create_param_locals(type->param_types);
+  fun->params = locals;
+
   fun->body = compound_stmt();
   fun->locals = locals;
 

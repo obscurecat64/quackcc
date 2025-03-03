@@ -151,7 +151,7 @@ static void gen_stmt(Node *node) {
       return;
     case NK_RETURN_STMT:
       gen_expr(node->lhs);
-      printf("b %s\n", gen_return_label_name());
+      printf("    b %s\n", gen_return_label_name());
       return;
     case NK_COMPOUND_STMT:
       for (Node *stmt = node->body; stmt; stmt = stmt->next) {
@@ -243,6 +243,11 @@ static void gen_func(Fun *fun) {
   printf("    stp fp, lr, [sp, #-16]!\n");
   printf("    mov fp, sp\n");
   printf("    sub sp, sp, #%d\n", fun->stack_size);
+
+  // move params in registers into their allocated space in the stack
+  int i = 0;
+  for (Obj *var = fun->params; var; var = var->next)
+    printf("    str %s, [fp, %d] \n", argreg[i++], var->offset);
 
   gen_stmt(fun->body);
 

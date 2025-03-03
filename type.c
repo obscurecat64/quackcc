@@ -25,6 +25,9 @@ void add_type(Node *node) {
   
   add_type(node->lhs);
   add_type(node->rhs);
+  add_type(node->cond);
+  for (Node *n = node->body; n; n = n->next) add_type(n);
+  for (Node *n = node->args; n; n = n->next) add_type(n);
   
   switch (node->kind) {
   case NK_ADD:
@@ -59,4 +62,10 @@ void add_type(Node *node) {
   default:
     return;
   }
+}
+
+Type *copy_type(Type *original) {
+  Type *copy = calloc(1, sizeof(Type));
+  *copy = *original;
+  return copy;
 }
