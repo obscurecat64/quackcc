@@ -1,6 +1,6 @@
 #include "quackcc.h"
 
-Type *type_int = &(Type){TYK_INT};
+Type *type_int = &(Type){TYK_INT, 8};
 
 bool is_integer(Type *type) {
   return type->kind == TYK_INT;
@@ -10,6 +10,16 @@ Type *create_pointer_to(Type *base) {
   Type *type = calloc(1, sizeof(Type));
   type->kind = TYK_PTR;
   type->base = base;
+  type->size = 8;
+  return type;
+}
+
+Type *create_array_of(Type *base, int len) {
+  Type *type = calloc(1, sizeof(Type));
+  type->kind = TYK_ARRAY;
+  type->array_len = len;
+  type->base = base;
+  type->size = base->size * len;
   return type;
 }
 
@@ -35,7 +45,11 @@ void add_type(Node *node) {
   case NK_MUL:
   case NK_DIV:
   case NK_NEG:
+    node->type = node->lhs->type;
+    return;
   case NK_ASSIGN:
+    if (node->lhs->type->kind == TYK_ARRAY)
+      error_at(node->token->loc, "not an lvalue");
     node->type = node->lhs->type;
     return;
   case NK_EQ:
@@ -52,10 +66,13 @@ void add_type(Node *node) {
     node->type = node->var->type;
     return;
   case NK_ADDR:
-    node->type = create_pointer_to(node->lhs->type);
+    if (node->lhs->type->kind == TYK_ARRAY)
+      node->type = create_pointer_to(node->lhs->type->base);
+    else
+      node->type = create_pointer_to(node->lhs->type);
     return;
   case NK_DEREF:
-    if (node->lhs->type->kind != TYK_PTR)
+    if (!node->lhs->type->base)
       error_at(node->token->loc, "invalid pointer dereference");
     else node->type = node->lhs->type->base;
     return;

@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/quackcc",
-            "args": ["int main() { return sub(5, 3); }"],
+            "args": ["int main() { int x[2]; int *y=&x; *y=3; return *x; }"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

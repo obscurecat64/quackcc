@@ -42,6 +42,22 @@ static void gen_addr(Node *node) {
   }
 }
 
+static void load(Type *type) {
+  if (type->kind == TYK_ARRAY) {
+    // do not attempt to load a value to the register, because in general we
+    // can't load an entire array to a register.
+    return;
+  }
+
+  printf("    ldr x0, [x0]\n");
+}
+
+static void store(void) {
+  // this is assuming that x1 is unused; we'll also store into x0
+  pop("x1");
+  printf("    str x1, [x0]\n");
+}
+
 static void gen_expr(Node *node) {
   switch(node->kind) {
   case NK_NUM:
@@ -53,18 +69,17 @@ static void gen_expr(Node *node) {
     return;
   case NK_VAR:
     gen_addr(node);
-    printf("    ldr x0, [x0]\n");
+    load(node->type);
     return;
   case NK_ASSIGN:
     gen_expr(node->rhs);
     push("x0");
     gen_addr(node->lhs);
-    pop("x1");
-    printf("    str x1, [x0]\n");
+    store();
     return;
   case NK_DEREF:
     gen_expr(node->lhs);
-    printf("    ldr x0, [x0]\n");
+    load(node->type);
     return;
   case NK_ADDR:
     gen_addr(node->lhs);
@@ -225,7 +240,7 @@ static int align_to(int n, int align) {
 static void assign_lvar_offsets(Fun *fun) {
   int offset = 0;
   for (Obj *var = fun->locals; var; var = var->next) {
-    offset += 8;
+    offset += var->type->size;
     var->offset = -offset;
   }
   fun->stack_size = align_to(offset, 16);

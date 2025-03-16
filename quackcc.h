@@ -1,4 +1,5 @@
 #include <assert.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -114,16 +115,23 @@ typedef enum {
   TYK_INT,
   TYK_PTR,
   TYK_FUN,
+  TYK_ARRAY,
 } TypeKind;
 
 struct Type {
   TypeKind kind;
 
-  // pointer
+  // sizeof() value
+  int size;
+
+  // pointer-to or array-of type
   Type *base;
 
   // declaration
   Token *ident;
+
+  // array
+  int array_len;
 
   // function type
   Type *return_type;
@@ -136,6 +144,7 @@ extern Type *type_int;
 bool is_integer(Type *type);
 void add_type(Node *node);
 Type *create_pointer_to(Type *base);
+Type *create_array_of(Type *base, int len);
 Type *create_function_type(Type *return_type);
 Type *copy_type(Type *original);
 

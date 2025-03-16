@@ -11,6 +11,12 @@ static char *get_ident(Token *token) {
   return strndup(token->loc, token->len);
 }
 
+static int get_number(Token *token) {
+  if (token->kind != TK_NUM)
+    error_at(token->loc, "expected a number");
+  return token->val;
+}
+
 static Node *create_node(NodeKind kind, Token *token) {
   Node *node = calloc(1, sizeof(Node));
   node->kind = kind;
@@ -66,7 +72,8 @@ static Node *create_add(Node *lhs, Node *rhs, Token *token) {
   }
 
   // ptr + num
-  rhs = create_binary(NK_MUL, rhs, create_num(8, token), token);
+  int base_size = lhs->type->base->size;
+  rhs = create_binary(NK_MUL, rhs, create_num(base_size, token), token);
   return create_binary(NK_ADD, lhs, rhs, token);
 };
 
@@ -88,15 +95,17 @@ static Node *create_sub(Node *lhs, Node *rhs, Token *token) {
 
   // ptr - num
   if (is_rhs_integer) {
-    rhs = create_binary(NK_MUL, rhs, create_num(8, token), token);
+    int base_size = lhs->type->base->size;
+    rhs = create_binary(NK_MUL, rhs, create_num(base_size, token), token);
     return create_binary(NK_SUB, lhs, rhs, token);
   }
 
   // ptr - ptr
   // return how many elements are between the two
+  int base_size = lhs->type->base->size;
   Node *node = create_binary(NK_SUB, lhs, rhs, token);
   node->type = type_int;
-  return create_binary(NK_DIV, node, create_num(8, token), token);
+  return create_binary(NK_DIV, node, create_num(base_size, token), token);
 };
 
 static Node *create_var(Obj *var, Token *token) {
@@ -145,6 +154,8 @@ static Node *declaration(void);
 static Node *declaration_prime(Type *base);
 static Type *declarator(Type *type);
 static Type *declarator_prefix(Type *type);
+static Type *func_params(Type *type);
+static Type *array_dimension(Type *type);
 static Type *declarator_suffix(Type *type);
 static Type *decl_spec(void);
 static Node *if_stmt(void);
@@ -264,7 +275,7 @@ static Node *declaration_prime(Type *base) {
 static Type *declarator(Type *type) {
   type = declarator_prefix(type);
 
-  if (!equal((*chain), "(")) return type;
+  if (!equal(*chain, "(") && !equal(*chain, "[")) return type;
   return declarator_suffix(type);
 }
 
@@ -285,9 +296,9 @@ static Type *declarator_prefix(Type *type) {
   return type;
 }
 
-// DeclaratorSuffix ->
+// FuncParams ->
 // "(" ((DeclSpec DeclaratorPrefix) ("," DeclSpec DeclaratorPrefix)* )? ")"
-static Type *declarator_suffix(Type *type) {
+static Type *func_params(Type *type) {
   Token *ident = type->ident;
 
   consume("(");
@@ -320,6 +331,29 @@ static Type *declarator_suffix(Type *type) {
   type->param_types = temp.next_param_type;
 
   return type;
+}
+
+// ArrayDimension -> "[" num "]"
+static Type *array_dimension(Type *type) {
+  Token *ident = type->ident;
+
+    consume("[");
+    int len = get_number(*chain);
+    skip();
+    consume("]");
+
+    type = create_array_of(type, len);
+    type->ident = ident;
+    return type;
+}
+
+// DeclaratorSuffix -> FuncParams | ArrayDimension
+static Type *declarator_suffix(Type *type) {
+  if (equal(*chain, "(")) return func_params(type);
+  if (equal(*chain, "[")) return array_dimension(type);
+
+  error_at((*chain)->loc, "expected '(' or '['");
+  return NULL;
 }
 
 // DeclSpec -> "int"
@@ -576,7 +610,7 @@ static Node *factor() {
   Token *head = *chain;
 
   if (head->kind == TK_NUM) {
-    int val = head->val;
+    int val = get_number(head);
     skip();
     return create_num(val, head);
   }
@@ -635,11 +669,11 @@ static Node *args() {
 }
 
 // FunctionDefinition ->
-// DeclSpec DeclaratorPrefix DeclaratorSuffix CompoundStatement
+// DeclSpec DeclaratorPrefix FuncParams CompoundStatement
 Fun *function_def() {
   Type *type = decl_spec();
   type = declarator_prefix(type);
-  type = declarator_suffix(type);
+  type = func_params(type);
 
   // reset locals
   locals = NULL;
