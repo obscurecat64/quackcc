@@ -300,6 +300,7 @@ static Type *declarator_prefix(Type *type) {
 // "(" ((DeclSpec DeclaratorPrefix) ("," DeclSpec DeclaratorPrefix)* )? ")"
 static Type *func_params(Type *type) {
   Token *ident = type->ident;
+  type->ident = NULL;
 
   consume("(");
 
@@ -336,6 +337,7 @@ static Type *func_params(Type *type) {
 // ArrayDimension -> ("[" num "]")*
 static Type *array_dimension(Type *type) {
   Token *ident = type->ident;
+  type->ident = NULL;
 
   int dimensions[16];
   int stack_top = -1;
