@@ -333,18 +333,28 @@ static Type *func_params(Type *type) {
   return type;
 }
 
-// ArrayDimension -> "[" num "]"
+// ArrayDimension -> ("[" num "]")*
 static Type *array_dimension(Type *type) {
   Token *ident = type->ident;
 
+  int dimensions[16];
+  int stack_top = -1;
+
+  while (equal(*chain, "[")) {
+    if (stack_top + 1 >= 16)
+      error_at((*chain)->loc, "Too many array dimensions");
     consume("[");
     int len = get_number(*chain);
     skip();
     consume("]");
+    dimensions[++stack_top] = len;
+  }
 
-    type = create_array_of(type, len);
-    type->ident = ident;
-    return type;
+  for (; stack_top >= 0; stack_top--)
+    type = create_array_of(type, dimensions[stack_top]);
+
+  type->ident = ident;
+  return type;
 }
 
 // DeclaratorSuffix -> FuncParams | ArrayDimension
