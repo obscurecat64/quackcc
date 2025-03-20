@@ -67,8 +67,8 @@ static Node *create_add(Node *lhs, Node *rhs, Token *token) {
   // canonicalize `num + ptr` to `ptr + num`
   if (is_lhs_integer && !is_rhs_integer) {
     Node *temp = lhs;
-    lhs = temp;
-    rhs = lhs;
+    lhs = rhs;
+    rhs = temp;
   }
 
   // ptr + num
@@ -176,6 +176,7 @@ static Node *sum_prime(Node *lhs);
 static Node *term(void);
 static Node *term_prime(Node *lhs);
 static Node *unary(void);
+static Node *postfix(void);
 static Node *factor(void);
 static Node *args(void);
 
@@ -590,7 +591,7 @@ static Node *term_prime(Node *lhs) {
   return node_b;
 }
 
-// Unary -> '+' Unary | '-' Unary | '*' Unary | '&' Unary | Factor
+// Unary -> '+' Unary | '-' Unary | '*' Unary | '&' Unary | Postfix
 static Node *unary() {
   Token *head = *chain;
 
@@ -614,7 +615,26 @@ static Node *unary() {
     return create_unary(NK_DEREF, unary(), head);
   }
 
-  return factor();
+  return postfix();
+}
+
+// Postfix -> Factor ("[" Expr "]")*
+static Node *postfix() {
+  Node *arr = factor();
+
+  Node *curr = arr;
+  while (equal(*chain, "[")) {
+    // x[y] is short for *(x+y)
+    Token *start = *chain;
+    consume("[");
+    Node *index = expr();
+    consume("]");
+
+    Node *add_node = create_add(curr, index, start);
+    curr = create_unary(NK_DEREF, add_node, start);
+  }
+
+  return curr;
 }
 
 // Factor -> Number | ( Expr ) | Ident (Args)?
