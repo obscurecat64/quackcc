@@ -187,7 +187,7 @@ static bool can_start_stmt() {
 
   if (head->kind == TK_KEYWORD) {
     if (equal(head, "return") || equal(head, "if") || equal(head, "for") ||
-        equal(head, "while"))
+        equal(head, "while") || equal(head, "sizeof"))
       return true;
   }
 
@@ -637,7 +637,7 @@ static Node *postfix() {
   return curr;
 }
 
-// Factor -> Number | ( Expr ) | Ident (Args)?
+// Factor -> Number | ( Expr ) | "sizeof" Unary | Ident (Args)?
 static Node *factor() {
   Token *head = *chain;
 
@@ -664,6 +664,12 @@ static Node *factor() {
     if (var == NULL) error_at(head->loc, "undefined variable");
     Node *node = create_var(var, head);
     skip();
+    return node;
+  }
+
+  if (equal(*chain, "sizeof")) {
+    skip();
+    Node *node = create_unary(NK_SIZEOF, unary(), head);
     return node;
   }
 

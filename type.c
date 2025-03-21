@@ -62,6 +62,10 @@ void add_type(Node *node) {
   case NK_FUNC_CALL:
     node->type = type_int;
     return;
+  case NK_SIZEOF:
+    // TODO: type of sizeof should be size_t
+    node->type = type_int;
+    return;
   case NK_VAR:
     node->type = node->var->type;
     return;

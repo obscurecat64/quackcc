@@ -60,6 +60,9 @@ static void store(void) {
 
 static void gen_expr(Node *node) {
   switch(node->kind) {
+  case NK_SIZEOF:
+    printf("    mov x0, #%d\n", node->lhs->type->size);
+    return;
   case NK_NUM:
     printf("    mov x0, #%d\n", node->val);
     return;

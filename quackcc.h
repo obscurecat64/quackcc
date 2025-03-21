@@ -70,6 +70,7 @@ typedef enum {
   NK_ADDR,
   NK_DEREF,
   NK_FUNC_CALL,
+  NK_SIZEOF,
 } NodeKind;
 
 typedef struct Obj Obj;
